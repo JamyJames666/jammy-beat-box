@@ -6,6 +6,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import YoutubeAPI from './youtube-api.js';
 import SpotifyAPI, {SpotifyTrack} from './spotify-api.js';
 import {URL} from 'node:url';
+import pLimit from 'p-limit';
 
 @injectable()
 export default class {
@@ -167,7 +168,8 @@ export default class {
   }
 
   private async spotifyToYouTube(tracks: SpotifyTrack[], shouldSplitChapters: boolean, playlist?: QueuedPlaylist | undefined): Promise<[SongMetadata[], number, number]> {
-    const promisedResults = tracks.map(async track => this.youtubeAPI.search(`"${track.name}" "${track.artist}"`, shouldSplitChapters));
+    const limit = pLimit(4);
+    const promisedResults = tracks.map(track => limit(() => this.youtubeAPI.search(`"${track.name}" "${track.artist}"`, shouldSplitChapters)));
     const searchResults = await Promise.allSettled(promisedResults);
 
     let nSongsNotFound = 0;
