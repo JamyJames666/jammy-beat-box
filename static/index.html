@@ -484,14 +484,28 @@
   $('search-btn').addEventListener('click', async () => {
     const q = $('search-input').value.trim();
     if (!q) return;
-    $('search-status').textContent = 'Adding…';
-    const res = await api('POST', `/api/guilds/${guildId}/play`, {query: q, channelId: channelId || undefined});
-    if (res) {
-      $('search-status').textContent = 'Added!';
-      $('search-input').value = '';
-      setTimeout(() => { $('search-status').textContent = ''; }, 2000);
-    } else {
-      $('search-status').textContent = 'Failed to add.';
+    const statusEl = $('search-status');
+    statusEl.style.color = 'var(--muted)';
+    statusEl.textContent = 'Adding…';
+    try {
+      const res = await fetch(`/api/guilds/${guildId}/play`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', Authorization: `Bearer ${token}`},
+        body: JSON.stringify({query: q, channelId: channelId || undefined}),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        statusEl.style.color = 'var(--muted)';
+        statusEl.textContent = `Added ${data.added} song${data.added !== 1 ? 's' : ''}!`;
+        $('search-input').value = '';
+        setTimeout(() => { statusEl.textContent = ''; }, 3000);
+      } else {
+        statusEl.style.color = 'var(--danger)';
+        statusEl.textContent = data.error ?? 'Failed to add.';
+      }
+    } catch {
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = 'Could not reach server.';
     }
     poll();
   });
