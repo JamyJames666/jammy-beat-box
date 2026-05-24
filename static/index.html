@@ -325,7 +325,7 @@
     guilds.forEach(g => {
       const opt = document.createElement('option');
       opt.value = g.id;
-      opt.textContent = `Server ${g.id.slice(-4)}`;
+      opt.textContent = g.name ?? `Server ${g.id.slice(-4)}`;
       if (g.id === guildId) opt.selected = true;
       sel.appendChild(opt);
     });

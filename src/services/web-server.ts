@@ -4,6 +4,7 @@ import express from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import {fileURLToPath} from 'url';
+import {Client} from 'discord.js';
 import {TYPES} from '../types.js';
 import Config from './config.js';
 import PlayerManager from '../managers/player.js';
@@ -19,14 +20,17 @@ export default class WebServer {
   private readonly password: string;
   private readonly port: number;
   private readonly playerManager: PlayerManager;
+  private readonly client: Client;
 
   constructor(
     @inject(TYPES.Config) config: Config,
     @inject(TYPES.Managers.Player) playerManager: PlayerManager,
+    @inject(TYPES.Client) client: Client,
   ) {
     this.password = config.WEB_PASSWORD;
     this.port = config.WEB_PORT;
     this.playerManager = playerManager;
+    this.client = client;
   }
 
   start(): void {
@@ -79,7 +83,7 @@ export default class WebServer {
     };
 
     this.app.get('/api/guilds', auth, (_req: express.Request, res: express.Response) => {
-      const guilds = this.playerManager.getAll().map(({guildId}) => ({id: guildId}));
+      const guilds = this.client.guilds.cache.map(g => ({id: g.id, name: g.name}));
       res.json(guilds);
     });
 
