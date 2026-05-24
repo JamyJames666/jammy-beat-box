@@ -41,6 +41,7 @@ import Volume from './commands/volume.js';
 import ThirdParty from './services/third-party.js';
 import FileCacheProvider from './services/file-cache.js';
 import KeyValueCacheProvider from './services/key-value-cache.js';
+import WebServer from './services/web-server.js';
 
 const container = new Container();
 
@@ -103,5 +104,7 @@ if (config.SPOTIFY_CLIENT_ID !== '' && config.SPOTIFY_CLIENT_SECRET !== '') {
 // Static libraries
 container.bind(TYPES.FileCache).to(FileCacheProvider);
 container.bind(TYPES.KeyValueCache).to(KeyValueCacheProvider);
+
+container.bind<WebServer>(TYPES.WebServer).to(WebServer).inSingletonScope();
 
 export default container;

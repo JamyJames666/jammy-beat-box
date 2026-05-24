@@ -8,6 +8,7 @@ import KeyValueCacheProvider from './key-value-cache.js';
 import {ONE_HOUR_IN_SECONDS, ONE_MINUTE_IN_SECONDS} from '../utils/constants.js';
 import {parseTime} from '../utils/time.js';
 import getYouTubeID from 'get-youtube-id';
+import {searchWithYtDlp} from '../utils/yt-dlp.js';
 
 interface VideoDetailsResponse {
   id: string;
@@ -80,6 +81,10 @@ export default class {
   }
 
   async search(query: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
+    if (!this.youtubeKey) {
+      return this.searchWithYtDlpFallback(query);
+    }
+
     const params = {
       searchParams: {
         part: 'snippet',
@@ -122,6 +127,10 @@ export default class {
       throw new Error('Video could not be found.');
     }
 
+    if (!this.youtubeKey) {
+      return this.getVideoWithYtDlpFallback(videoId);
+    }
+
     const result = await this.getVideosByID([videoId]);
     const video = result.at(0);
 
@@ -130,6 +139,40 @@ export default class {
     }
 
     return this.getMetadataFromVideo({video, shouldSplitChapters});
+  }
+
+  private async searchWithYtDlpFallback(query: string): Promise<SongMetadata[]> {
+    const result = await searchWithYtDlp(query);
+    if (!result) return [];
+
+    return [{
+      source: MediaSource.Youtube,
+      title: result.title,
+      artist: result.uploader,
+      length: result.duration,
+      offset: 0,
+      url: result.id,
+      playlist: null,
+      isLive: result.is_live,
+      thumbnailUrl: result.thumbnail,
+    }];
+  }
+
+  private async getVideoWithYtDlpFallback(videoId: string): Promise<SongMetadata[]> {
+    const result = await searchWithYtDlp(`https://www.youtube.com/watch?v=${videoId}`);
+    if (!result) throw new Error('Video could not be found.');
+
+    return [{
+      source: MediaSource.Youtube,
+      title: result.title,
+      artist: result.uploader,
+      length: result.duration,
+      offset: 0,
+      url: result.id,
+      playlist: null,
+      isLive: result.is_live,
+      thumbnailUrl: result.thumbnail,
+    }];
   }
 
   async getPlaylist(listId: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {

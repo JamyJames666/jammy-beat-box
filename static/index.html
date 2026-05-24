@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Muse Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #22222f;
+      --border: #2e2e3e;
+      --accent: #7c3aed;
+      --accent-hover: #6d28d9;
+      --text: #e2e2f0;
+      --muted: #888899;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+    body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; min-height: 100vh; }
+
+    /* LOGIN */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    }
+    .login-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 2.5rem; width: 360px; text-align: center;
+    }
+    .login-card h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+    .login-card p { color: var(--muted); margin-bottom: 2rem; font-size: 0.9rem; }
+    .login-card input {
+      width: 100%; padding: 0.75rem 1rem; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 8px; color: var(--text);
+      font-size: 1rem; margin-bottom: 1rem; outline: none;
+    }
+    .login-card input:focus { border-color: var(--accent); }
+    .btn {
+      padding: 0.7rem 1.5rem; border: none; border-radius: 8px; font-size: 0.95rem;
+      cursor: pointer; font-weight: 600; transition: background 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-sm { padding: 0.4rem 1rem; font-size: 0.85rem; }
+    .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; min-height: 1.2em; }
+
+    /* OVERLAY */
+    #overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      align-items: center; justify-content: center; z-index: 100;
+    }
+    #overlay.show { display: flex; }
+    .overlay-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+      padding: 2rem; width: 340px; text-align: center;
+    }
+    .overlay-card h2 { margin-bottom: 1rem; }
+    .overlay-card p { color: var(--muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
+
+    /* APP */
+    #app { display: none; }
+    #app.show { display: block; }
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem; display: flex; align-items: center; gap: 1rem;
+    }
+    header h1 { font-size: 1.2rem; flex: 1; }
+    .guild-select {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.9rem;
+    }
+
+    main { max-width: 960px; margin: 0 auto; padding: 1.5rem; display: grid; gap: 1.5rem; }
+
+    /* NOW PLAYING */
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem;
+    }
+    .now-playing { display: flex; gap: 1.5rem; align-items: center; }
+    .thumb-wrap { position: relative; flex-shrink: 0; }
+    .thumb-wrap img {
+      width: 100px; height: 100px; border-radius: 8px; object-fit: cover;
+      background: var(--surface2);
+    }
+    .thumb-placeholder {
+      width: 100px; height: 100px; border-radius: 8px;
+      background: var(--surface2); display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; color: var(--muted);
+    }
+    .playing-bars {
+      position: absolute; bottom: 6px; right: 6px;
+      display: flex; align-items: flex-end; gap: 2px; height: 18px;
+    }
+    .playing-bars span {
+      display: block; width: 3px; background: var(--accent); border-radius: 2px;
+      animation: bars 0.8s ease-in-out infinite alternate;
+    }
+    .playing-bars span:nth-child(2) { animation-delay: 0.2s; }
+    .playing-bars span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bars { from { height: 4px; } to { height: 16px; } }
+    .playing-bars.paused span { animation-play-state: paused; height: 4px; }
+
+    .song-info { flex: 1; min-width: 0; }
+    .song-title { font-size: 1.15rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .song-artist { color: var(--muted); font-size: 0.9rem; margin-top: 0.2rem; }
+    .progress-wrap { margin-top: 0.8rem; }
+    .progress-bar {
+      height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-bottom: 0.3rem;
+    }
+    .progress-fill { height: 100%; background: var(--accent); transition: width 1s linear; }
+    .time-row { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); }
+
+    .controls { display: flex; gap: 0.75rem; margin-top: 1.25rem; align-items: center; }
+    .ctrl-btn {
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 0.5rem 1.1rem; cursor: pointer; font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    .ctrl-btn:hover { background: var(--border); }
+    .ctrl-btn.active { background: var(--accent); border-color: var(--accent); }
+    .vol-label { margin-left: auto; font-size: 0.85rem; color: var(--muted); }
+    input[type=range] {
+      accent-color: var(--accent); width: 90px; cursor: pointer;
+    }
+    .idle-msg { color: var(--muted); font-size: 0.95rem; }
+
+    /* QUEUE */
+    .queue-list { list-style: none; display: flex; flex-direction: column; gap: 0.5rem; }
+    .queue-item {
+      display: flex; align-items: center; gap: 0.75rem;
+      background: var(--surface2); border-radius: 8px; padding: 0.6rem 0.8rem;
+    }
+    .q-num { color: var(--muted); font-size: 0.8rem; width: 1.5rem; text-align: right; flex-shrink: 0; }
+    .q-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .q-dur { color: var(--muted); font-size: 0.8rem; flex-shrink: 0; }
+    .queue-empty { color: var(--muted); font-size: 0.9rem; }
+
+    /* SEARCH */
+    .tab-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tab-btn {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      border-radius: 6px; padding: 0.35rem 0.9rem; font-size: 0.85rem; cursor: pointer;
+    }
+    .tab-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .search-row { display: flex; gap: 0.75rem; }
+    .search-row input {
+      flex: 1; padding: 0.7rem 1rem; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.95rem; outline: none;
+    }
+    .search-row input:focus { border-color: var(--accent); }
+
+    /* RECONNECTING */
+    #reconnecting {
+      display: none; position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 0.6rem 1.2rem; font-size: 0.85rem; color: var(--muted); z-index: 50;
+    }
+    #reconnecting.show { display: block; }
+
+    @media (max-width: 600px) {
+      .now-playing { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>🎵 Muse</h1>
+    <p>Enter your dashboard password</p>
+    <input type="password" id="pw-input" placeholder="Password" autocomplete="current-password">
+    <button class="btn btn-primary" id="login-btn">Sign in</button>
+    <p class="error-msg" id="login-error"></p>
+  </div>
+</div>
+
+<!-- RE-LOGIN OVERLAY -->
+<div id="overlay">
+  <div class="overlay-card">
+    <h2>Session expired</h2>
+    <p>Please enter your password to continue.</p>
+    <input type="password" id="relogin-input" placeholder="Password" autocomplete="current-password">
+    <button class="btn btn-primary" id="relogin-btn" style="margin-top:0.75rem">Sign in</button>
+    <p class="error-msg" id="relogin-error"></p>
+  </div>
+</div>
+
+<!-- RECONNECTING TOAST -->
+<div id="reconnecting">Reconnecting…</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <h1>🎵 Muse</h1>
+    <select class="guild-select" id="guild-select"></select>
+  </header>
+  <main>
+    <!-- NOW PLAYING -->
+    <div class="card" id="player-card">
+      <div class="idle-msg" id="idle-msg">Nothing is playing.</div>
+      <div id="now-playing-section" style="display:none">
+        <div class="now-playing">
+          <div class="thumb-wrap">
+            <img id="thumb" src="" alt="" style="display:none">
+            <div class="thumb-placeholder" id="thumb-placeholder">♪</div>
+            <div class="playing-bars" id="playing-bars">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="song-info">
+            <div class="song-title" id="song-title">—</div>
+            <div class="song-artist" id="song-artist">—</div>
+            <div class="progress-wrap">
+              <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+              <div class="time-row"><span id="pos-time">0:00</span><span id="dur-time">0:00</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn" id="pause-btn">⏸ Pause</button>
+          <button class="ctrl-btn" id="skip-btn">⏭ Skip</button>
+          <button class="ctrl-btn" id="stop-btn">⏹ Stop</button>
+          <span class="vol-label">Vol</span>
+          <input type="range" min="0" max="200" id="vol-slider">
+          <span id="vol-display" style="font-size:0.85rem;color:var(--muted);min-width:2.5rem">100</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUEUE -->
+    <div class="card">
+      <h2 style="margin-bottom:1rem;font-size:1rem">Queue</h2>
+      <ul class="queue-list" id="queue-list"></ul>
+      <p class="queue-empty" id="queue-empty" style="display:none">Queue is empty.</p>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="card">
+      <h2 style="margin-bottom:1rem;font-size:1rem">Add to queue</h2>
+      <div class="tab-row">
+        <button class="tab-btn active" data-tab="youtube">YouTube</button>
+        <button class="tab-btn" data-tab="spotify">Spotify</button>
+      </div>
+      <div class="search-row">
+        <input type="text" id="search-input" placeholder="Song name or URL…">
+        <button class="btn btn-primary btn-sm" id="search-btn">Add</button>
+      </div>
+      <p id="search-status" style="font-size:0.85rem;color:var(--muted);margin-top:0.5rem;min-height:1.2em"></p>
+    </div>
+  </main>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let token = localStorage.getItem('muse_token') ?? '';
+  let guildId = localStorage.getItem('muse_guild') ?? '';
+  let pollTimer = null;
+  let lastStatus = null;
+  let activeTab = 'youtube';
+
+  // ---- AUTH ----
+  async function login(password, errorEl) {
+    errorEl.textContent = '';
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({password}),
+    });
+    if (!res.ok) {
+      const {error} = await res.json();
+      errorEl.textContent = error ?? 'Login failed';
+      return false;
+    }
+    const {token: t} = await res.json();
+    token = t;
+    localStorage.setItem('muse_token', token);
+    return true;
+  }
+
+  $('login-btn').addEventListener('click', async () => {
+    const ok = await login($('pw-input').value, $('login-error'));
+    if (ok) showApp();
+  });
+  $('pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+
+  $('relogin-btn').addEventListener('click', async () => {
+    const ok = await login($('relogin-input').value, $('relogin-error'));
+    if (ok) {
+      $('overlay').classList.remove('show');
+      $('relogin-input').value = '';
+    }
+  });
+  $('relogin-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('relogin-btn').click(); });
+
+  // ---- API ----
+  async function api(method, path, body) {
+    try {
+      $('reconnecting').classList.remove('show');
+      const res = await fetch(path, {
+        method,
+        headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (res.status === 401) {
+        $('overlay').classList.add('show');
+        return null;
+      }
+      return res.ok ? res.json() : null;
+    } catch {
+      $('reconnecting').classList.add('show');
+      return null;
+    }
+  }
+
+  // ---- APP ----
+  async function showApp() {
+    $('login-screen').style.display = 'none';
+    $('app').classList.add('show');
+    const guilds = await api('GET', '/api/guilds');
+    if (!guilds) return;
+    const sel = $('guild-select');
+    sel.innerHTML = '';
+    guilds.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = g.id;
+      opt.textContent = `Server ${g.id.slice(-4)}`;
+      if (g.id === guildId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    if (!guildId && guilds.length) guildId = guilds[0].id;
+    startPolling();
+  }
+
+  $('guild-select').addEventListener('change', e => {
+    guildId = e.target.value;
+    localStorage.setItem('muse_guild', guildId);
+  });
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    poll();
+    pollTimer = setInterval(poll, 2000);
+  }
+
+  async function poll() {
+    if (!guildId) return;
+    const s = await api('GET', `/api/guilds/${guildId}/status`);
+    if (!s) return;
+    $('reconnecting').classList.remove('show');
+    renderStatus(s);
+  }
+
+  function fmt(sec) {
+    const m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function renderStatus(s) {
+    const playing = s.status === 'PLAYING' || s.status === 'PAUSED';
+    $('idle-msg').style.display = playing ? 'none' : '';
+    $('now-playing-section').style.display = playing ? '' : 'none';
+
+    if (s.nowPlaying) {
+      $('song-title').textContent = s.nowPlaying.title;
+      $('song-artist').textContent = s.nowPlaying.artist;
+      const thumb = $('thumb');
+      if (s.nowPlaying.thumbnailUrl) {
+        thumb.src = s.nowPlaying.thumbnailUrl;
+        thumb.style.display = '';
+        $('thumb-placeholder').style.display = 'none';
+      } else {
+        thumb.style.display = 'none';
+        $('thumb-placeholder').style.display = '';
+      }
+      const pos = s.position ?? 0;
+      const len = s.nowPlaying.length ?? 1;
+      $('progress-fill').style.width = `${Math.min(100, (pos / len) * 100)}%`;
+      $('pos-time').textContent = fmt(pos);
+      $('dur-time').textContent = fmt(len);
+    }
+
+    const bars = $('playing-bars');
+    bars.classList.toggle('paused', s.status !== 'PLAYING');
+
+    const pauseBtn = $('pause-btn');
+    if (s.status === 'PLAYING') {
+      pauseBtn.textContent = '⏸ Pause';
+    } else if (s.status === 'PAUSED') {
+      pauseBtn.textContent = '▶ Resume';
+    }
+
+    // Volume
+    if (s.volume !== undefined && document.activeElement !== $('vol-slider')) {
+      $('vol-slider').value = s.volume;
+      $('vol-display').textContent = s.volume;
+    }
+
+    // Queue
+    const list = $('queue-list');
+    list.innerHTML = '';
+    if (s.queue && s.queue.length > 0) {
+      $('queue-empty').style.display = 'none';
+      s.queue.forEach((item, i) => {
+        const li = document.createElement('li');
+        li.className = 'queue-item';
+        li.innerHTML = `<span class="q-num">${i + 1}</span><span class="q-title">${esc(item.title)}</span><span class="q-dur">${fmt(item.length)}</span>`;
+        list.appendChild(li);
+      });
+    } else {
+      $('queue-empty').style.display = '';
+    }
+
+    lastStatus = s;
+  }
+
+  function esc(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ---- CONTROLS ----
+  $('pause-btn').addEventListener('click', async () => {
+    if (!lastStatus) return;
+    if (lastStatus.status === 'PLAYING') {
+      await api('POST', `/api/guilds/${guildId}/pause`);
+    } else {
+      await api('POST', `/api/guilds/${guildId}/resume`);
+    }
+    poll();
+  });
+
+  $('skip-btn').addEventListener('click', async () => {
+    await api('POST', `/api/guilds/${guildId}/skip`);
+    poll();
+  });
+
+  $('stop-btn').addEventListener('click', async () => {
+    await api('POST', `/api/guilds/${guildId}/stop`);
+    poll();
+  });
+
+  $('vol-slider').addEventListener('input', e => {
+    $('vol-display').textContent = e.target.value;
+  });
+  $('vol-slider').addEventListener('change', async e => {
+    await api('POST', `/api/guilds/${guildId}/volume`, {level: parseInt(e.target.value, 10)});
+  });
+
+  // ---- SEARCH ----
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      $('search-input').placeholder = activeTab === 'spotify'
+        ? 'Spotify URL or track name…' : 'Song name or YouTube URL…';
+    });
+  });
+
+  $('search-btn').addEventListener('click', async () => {
+    const q = $('search-input').value.trim();
+    if (!q) return;
+    $('search-status').textContent = 'Adding…';
+    const res = await api('POST', `/api/guilds/${guildId}/play`, {query: q});
+    if (res) {
+      $('search-status').textContent = 'Added!';
+      $('search-input').value = '';
+      setTimeout(() => { $('search-status').textContent = ''; }, 2000);
+    } else {
+      $('search-status').textContent = 'Failed to add.';
+    }
+    poll();
+  });
+  $('search-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('search-btn').click(); });
+
+  // ---- KEYBOARD SHORTCUTS ----
+  document.addEventListener('keydown', e => {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+    if (e.key === ' ') { e.preventDefault(); $('pause-btn').click(); }
+    if (e.key === 'ArrowRight') $('skip-btn').click();
+    if (e.key.toLowerCase() === 's') $('stop-btn').click();
+  });
+
+  // ---- INIT ----
+  if (token) {
+    showApp();
+  }
+</script>
+</body>
+</html>

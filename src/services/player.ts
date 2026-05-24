@@ -22,7 +22,7 @@ import FileCacheProvider from './file-cache.js';
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import {getYouTubeMediaSource} from '../utils/yt-dlp.js';
+import {getYouTubeMediaSource, createYtDlpAudioStream} from '../utils/yt-dlp.js';
 import {Setting} from '@prisma/client';
 
 export enum MediaSource {
@@ -83,6 +83,7 @@ export default class {
   private positionInSeconds = 0;
   private readonly fileCache: FileCacheProvider;
   private disconnectTimer: NodeJS.Timeout | null = null;
+  private emptyChannelTimer: NodeJS.Timeout | null = null;
 
   private readonly channelToSpeakingUsers: Map<string, Set<string>> = new Map();
   private hasRegisteredVoiceActivityListener = false;
@@ -482,6 +483,23 @@ export default class {
     this.queue = [];
   }
 
+  scheduleEmptyChannelDisconnect(seconds: number): void {
+    if (this.emptyChannelTimer) return;
+    this.emptyChannelTimer = setTimeout(() => {
+      this.emptyChannelTimer = null;
+      if (this.voiceConnection) {
+        this.disconnect();
+      }
+    }, seconds * 1000);
+  }
+
+  cancelEmptyChannelDisconnect(): void {
+    if (this.emptyChannelTimer) {
+      clearTimeout(this.emptyChannelTimer);
+      this.emptyChannelTimer = null;
+    }
+  }
+
   move(from: number, to: number): QueuedSong {
     if (from > this.queueSize() || to > this.queueSize()) {
       throw new Error('Move index is outside the range of the queue.');
@@ -515,7 +533,7 @@ export default class {
     }
 
     if (song.source === MediaSource.HLS) {
-      return this.createReadStream({url: song.url, cacheKey: song.url});
+      return this.createReadStream({input: song.url, cacheKey: song.url});
     }
 
     let ffmpegInput: string | null;
@@ -525,24 +543,25 @@ export default class {
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
+      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
+
+      if (!options.seek) {
+        // Pipe yt-dlp stdout directly to ffmpeg so yt-dlp handles DASH segments internally
+        const {stream: ytdlpStream, kill: ytdlpKill} = createYtDlpAudioStream(song.url);
+        shouldCacheVideo = !song.isLive && song.length < MAX_CACHE_LENGTH_SECONDS;
+        debug(shouldCacheVideo ? 'Caching video (piped)' : 'Streaming via yt-dlp pipe');
+        return this.createReadStream({
+          input: ytdlpStream,
+          ytdlpKill,
+          cacheKey: song.url,
+          cache: shouldCacheVideo,
+        });
+      }
+
+      // Seek: need a URL with -ss; piped stream doesn't support seeking
       const mediaSource = await getYouTubeMediaSource(song.url);
       ffmpegInput = mediaSource.url;
-
-      // Don't cache livestreams or long videos
-      const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
-      shouldCacheVideo = !mediaSource.isLive && song.length < MAX_CACHE_LENGTH_SECONDS && !options.seek;
-
-      debug(shouldCacheVideo ? 'Caching video' : 'Not caching video');
-
-      ffmpegInputOptions.push(...[
-        '-reconnect',
-        '1',
-        '-reconnect_streamed',
-        '1',
-        '-reconnect_delay_max',
-        '5',
-      ]);
-
+      ffmpegInputOptions.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
       const headerOptions = this.buildFfmpegHeaderOptions(mediaSource.headers);
       ffmpegInputOptions.push(...headerOptions);
     }
@@ -556,7 +575,7 @@ export default class {
     }
 
     return this.createReadStream({
-      url: ffmpegInput,
+      input: ffmpegInput,
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
@@ -686,7 +705,7 @@ export default class {
     return ['-headers', `${headerLines}\r\n`];
   }
 
-  private async createReadStream(options: {url: string; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean}): Promise<Readable> {
+  private async createReadStream(options: {input: string | Readable; ytdlpKill?: () => void; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean}): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
 
@@ -698,8 +717,12 @@ export default class {
       const returnedStream = capacitor.createReadStream();
       let hasReturnedStreamClosed = false;
 
-      const stream = ffmpeg(options.url)
-        .inputOptions(options?.ffmpegInputOptions ?? ['-re'])
+      const inputOptions = typeof options.input === 'string'
+        ? (options?.ffmpegInputOptions ?? ['-re'])
+        : [];
+
+      const stream = ffmpeg(options.input)
+        .inputOptions(inputOptions)
         .noVideo()
         .audioCodec('libopus')
         .outputFormat('webm')
@@ -717,6 +740,7 @@ export default class {
       returnedStream.on('close', () => {
         if (!options.cache) {
           stream.kill('SIGKILL');
+          options.ytdlpKill?.();
         }
 
         hasReturnedStreamClosed = true;

@@ -6,6 +6,7 @@ export const TYPES = {
   Config: Symbol('Config'),
   Command: Symbol('Command'),
   ThirdParty: Symbol('ThirdParty'),
+  WebServer: Symbol('WebServer'),
   Managers: {
     Player: Symbol('PlayerManager'),
   },

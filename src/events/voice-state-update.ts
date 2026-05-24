@@ -4,11 +4,11 @@ import container from '../inversify.config.js';
 import {TYPES} from '../types.js';
 import PlayerManager from '../managers/player.js';
 import {getSizeWithoutBots} from '../utils/channels.js';
-import {getGuildSettings} from '../utils/get-guild-settings.js';
+
+const EMPTY_CHANNEL_TIMEOUT_SECONDS = 10 * 60; // 10 minutes
 
 export default async (oldState: VoiceState, newState: VoiceState): Promise<void> => {
   const playerManager = container.get<PlayerManager>(TYPES.Managers.Player);
-
   const player = playerManager.get(oldState.guild.id);
 
   if (!player.voiceConnection || player.voiceConnection.state.status !== VoiceConnectionStatus.Ready) {
@@ -21,8 +21,14 @@ export default async (oldState: VoiceState, newState: VoiceState): Promise<void>
   }
 
   const voiceChannel = newState.guild.channels.cache.get(channelId) as VoiceChannel | undefined;
-  const {leaveIfNoListeners} = await getGuildSettings(player.guildId);
-  if (!voiceChannel || (getSizeWithoutBots(voiceChannel) === 0 && leaveIfNoListeners)) {
+  if (!voiceChannel) {
     player.disconnect();
+    return;
+  }
+
+  if (getSizeWithoutBots(voiceChannel) === 0) {
+    player.scheduleEmptyChannelDisconnect(EMPTY_CHANNEL_TIMEOUT_SECONDS);
+  } else {
+    player.cancelEmptyChannelDisconnect();
   }
 };

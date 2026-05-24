@@ -15,7 +15,7 @@ const firstNonEmpty = (...values: Array<string | undefined>) => values
 
 const CONFIG_MAP = {
   DISCORD_TOKEN: process.env.DISCORD_TOKEN,
-  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+  YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY ?? '',
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID ?? '',
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET ?? '',
   REGISTER_COMMANDS_ON_BOT: process.env.REGISTER_COMMANDS_ON_BOT === 'true',
@@ -30,6 +30,8 @@ const CONFIG_MAP = {
   SPONSORBLOCK_TIMEOUT: parseInt(process.env.SPONSORBLOCK_TIMEOUT ?? '5', 10),
   YT_DLP_PATH: firstNonEmpty(process.env.YT_DLP_PATH, process.env.MUSE_BUNDLED_YT_DLP_PATH) ?? 'yt-dlp',
   YT_DLP_AUTO_UPDATE: process.env.YT_DLP_AUTO_UPDATE === 'true',
+  WEB_PASSWORD: process.env.WEB_PASSWORD ?? '',
+  WEB_PORT: parseInt(process.env.WEB_PORT ?? '4000', 10),
 } as const;
 
 const BOT_ACTIVITY_TYPE_MAP = {
@@ -57,6 +59,8 @@ export default class Config {
   readonly SPONSORBLOCK_TIMEOUT!: number;
   readonly YT_DLP_PATH!: string;
   readonly YT_DLP_AUTO_UPDATE!: boolean;
+  readonly WEB_PASSWORD!: string;
+  readonly WEB_PORT!: number;
 
   constructor() {
     for (const [key, value] of Object.entries(CONFIG_MAP)) {
