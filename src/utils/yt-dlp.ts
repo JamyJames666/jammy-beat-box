@@ -346,6 +346,36 @@ interface YtDlpSearchResult {
   readonly is_live: boolean;
 }
 
+interface YtDlpPlaylistEntry {
+  readonly id: string;
+  readonly title: string;
+  readonly uploader?: string;
+  readonly duration?: number;
+  readonly thumbnail?: string;
+  readonly is_live?: boolean;
+}
+
+export interface YtDlpPlaylistResult {
+  readonly title: string;
+  readonly entries: YtDlpPlaylistEntry[];
+}
+
+export const getYouTubePlaylist = async (playlistId: string): Promise<YtDlpPlaylistResult | null> => {
+  try {
+    const {stdout} = await execa(getExecutable(), [
+      '--flat-playlist',
+      '--dump-single-json',
+      '--no-warnings',
+      '--no-cache-dir',
+      `https://www.youtube.com/playlist?list=${playlistId}`,
+    ], {timeout: 60_000});
+
+    return JSON.parse(stdout) as YtDlpPlaylistResult;
+  } catch {
+    return null;
+  }
+};
+
 export const searchWithYtDlp = async (query: string): Promise<YtDlpSearchResult | null> => {
   try {
     const {stdout} = await execa(getExecutable(), [

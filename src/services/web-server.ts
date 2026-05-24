@@ -4,10 +4,11 @@ import express from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import {fileURLToPath} from 'url';
-import {Client} from 'discord.js';
+import {Client, VoiceChannel, ChannelType} from 'discord.js';
 import {TYPES} from '../types.js';
 import Config from './config.js';
 import PlayerManager from '../managers/player.js';
+import GetSongs from './get-songs.js';
 import {STATUS} from './player.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,16 +22,19 @@ export default class WebServer {
   private readonly port: number;
   private readonly playerManager: PlayerManager;
   private readonly client: Client;
+  private readonly getSongs: GetSongs;
 
   constructor(
     @inject(TYPES.Config) config: Config,
     @inject(TYPES.Managers.Player) playerManager: PlayerManager,
     @inject(TYPES.Client) client: Client,
+    @inject(TYPES.Services.GetSongs) getSongs: GetSongs,
   ) {
     this.password = config.WEB_PASSWORD;
     this.port = config.WEB_PORT;
     this.playerManager = playerManager;
     this.client = client;
+    this.getSongs = getSongs;
   }
 
   start(): void {
@@ -85,6 +89,65 @@ export default class WebServer {
     this.app.get('/api/guilds', auth, (_req: express.Request, res: express.Response) => {
       const guilds = this.client.guilds.cache.map(g => ({id: g.id, name: g.name}));
       res.json(guilds);
+    });
+
+    this.app.get('/api/guilds/:guildId/channels', auth, (req: express.Request, res: express.Response) => {
+      const guild = this.client.guilds.cache.get(req.params.guildId);
+      if (!guild) {
+        res.status(404).json({error: 'Guild not found'});
+        return;
+      }
+
+      const channels = guild.channels.cache
+        .filter(c => c.type === ChannelType.GuildVoice)
+        .map(c => ({id: c.id, name: c.name}));
+      res.json(Array.from(channels.values()));
+    });
+
+    this.app.post('/api/guilds/:guildId/play', auth, async (req: express.Request, res: express.Response) => {
+      const {query, channelId} = req.body as {query?: string; channelId?: string};
+      if (!query) {
+        res.status(400).json({error: 'query is required'});
+        return;
+      }
+
+      const guild = this.client.guilds.cache.get(req.params.guildId);
+      if (!guild) {
+        res.status(404).json({error: 'Guild not found'});
+        return;
+      }
+
+      try {
+        const [songs] = await this.getSongs.getSongs(query, 100, false);
+        if (songs.length === 0) {
+          res.status(400).json({error: 'No songs found'});
+          return;
+        }
+
+        const player = this.playerManager.get(req.params.guildId);
+        const fallbackChannelId = guild.channels.cache.find(c => c.type === ChannelType.GuildVoice)?.id ?? '';
+        const targetChannelId = channelId ?? fallbackChannelId;
+
+        songs.forEach(song => {
+          player.add({
+            ...song,
+            addedInChannelId: targetChannelId,
+            requestedBy: 'web-dashboard',
+          });
+        });
+
+        if (!player.voiceConnection && targetChannelId) {
+          const channel = guild.channels.cache.get(targetChannelId) as VoiceChannel;
+          await player.connect(channel);
+          await player.play();
+        } else if (player.status === STATUS.IDLE) {
+          await player.play();
+        }
+
+        res.json({ok: true, added: songs.length, first: songs[0].title});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
     });
 
     this.app.get('/api/guilds/:guildId/status', auth, (req: express.Request, res: express.Response) => {

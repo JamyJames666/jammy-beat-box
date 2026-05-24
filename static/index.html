@@ -194,8 +194,13 @@
     <div class="card">
       <h2 style="margin-bottom:1rem;font-size:1rem">Add to queue</h2>
       <div class="tab-row">
-        <button class="tab-btn active" data-tab="youtube">YouTube</button>
-        <button class="tab-btn" data-tab="spotify">Spotify</button>
+        <button class="tab-btn active" data-tab="youtube">▶ YouTube</button>
+        <button class="tab-btn" data-tab="spotify">● Spotify</button>
+      </div>
+      <div class="search-row" style="margin-bottom:0.6rem">
+        <select class="guild-select" id="channel-select" style="flex-shrink:0;max-width:200px">
+          <option value="">🔊 Voice channel…</option>
+        </select>
       </div>
       <div class="search-row">
         <input type="text" id="search-input" placeholder="Song name or URL…">
@@ -215,6 +220,8 @@
   let lastStatus = null;
   let localPosition = 0;
   let localLength = 0;
+  let currentSongUrl = '';
+  let channelId = '';
 
   // ---- AUTH ----
   async function login(password, errorEl) {
@@ -283,12 +290,32 @@
     });
     if (!guildId && guilds.length) guildId = guilds[0].id;
     localStorage.setItem('muse_guild', guildId);
+    await loadChannels(guildId);
     startPolling();
   }
 
-  $('guild-select').addEventListener('change', e => {
+  async function loadChannels(gId) {
+    const chanSel = $('channel-select');
+    chanSel.innerHTML = '<option value="">🔊 Voice channel…</option>';
+    channelId = '';
+    if (!gId) return;
+    const channels = await api('GET', `/api/guilds/${gId}/channels`);
+    if (!channels) return;
+    channels.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = `🔊 ${c.name}`;
+      chanSel.appendChild(opt);
+    });
+    if (channels.length) { channelId = channels[0].id; chanSel.value = channelId; }
+  }
+
+  $('channel-select').addEventListener('change', e => { channelId = e.target.value; });
+
+  $('guild-select').addEventListener('change', async e => {
     guildId = e.target.value;
     localStorage.setItem('muse_guild', guildId);
+    await loadChannels(guildId);
     poll();
   });
 
@@ -306,15 +333,26 @@
   }
 
   // ---- SMOOTH TIMER ----
-  function startTick(pos, len, playing) {
-    localPosition = pos;
-    localLength = len;
-    if (tickTimer) clearInterval(tickTimer);
-    if (!playing) { updateTimerUI(pos, len); return; }
-    tickTimer = setInterval(() => {
-      localPosition = Math.min(localPosition + 1, localLength);
-      updateTimerUI(localPosition, localLength);
-    }, 1000);
+  function startTick(serverPos, len, songUrl, playing) {
+    const songChanged = songUrl !== currentSongUrl;
+    if (songChanged) {
+      currentSongUrl = songUrl;
+      localPosition = serverPos;
+      localLength = len;
+      if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+    } else {
+      localLength = len;
+      const drift = Math.abs(localPosition - serverPos);
+      if (drift > 3) localPosition = serverPos;
+    }
+    if (playing && !tickTimer) {
+      tickTimer = setInterval(() => {
+        localPosition = Math.min(localPosition + 1, localLength);
+        updateTimerUI(localPosition, localLength);
+      }, 1000);
+    } else if (!playing && tickTimer) {
+      clearInterval(tickTimer); tickTimer = null;
+    }
     updateTimerUI(localPosition, localLength);
   }
 
@@ -354,7 +392,7 @@
         $('thumb-placeholder').style.display = '';
       }
 
-      startTick(s.position ?? 0, s.nowPlaying.length ?? 0, playing);
+      startTick(s.position ?? 0, s.nowPlaying.length ?? 0, s.nowPlaying.url ?? '', playing);
     }
 
     $('playing-bars').classList.toggle('paused', !playing);
@@ -447,7 +485,7 @@
     const q = $('search-input').value.trim();
     if (!q) return;
     $('search-status').textContent = 'Adding…';
-    const res = await api('POST', `/api/guilds/${guildId}/play`, {query: q});
+    const res = await api('POST', `/api/guilds/${guildId}/play`, {query: q, channelId: channelId || undefined});
     if (res) {
       $('search-status').textContent = 'Added!';
       $('search-input').value = '';

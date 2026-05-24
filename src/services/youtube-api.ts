@@ -8,7 +8,7 @@ import KeyValueCacheProvider from './key-value-cache.js';
 import {ONE_HOUR_IN_SECONDS, ONE_MINUTE_IN_SECONDS} from '../utils/constants.js';
 import {parseTime} from '../utils/time.js';
 import getYouTubeID from 'get-youtube-id';
-import {searchWithYtDlp} from '../utils/yt-dlp.js';
+import {searchWithYtDlp, getYouTubePlaylist} from '../utils/yt-dlp.js';
 
 interface VideoDetailsResponse {
   id: string;
@@ -176,6 +176,11 @@ export default class {
   }
 
   async getPlaylist(listId: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
+    if (!this.youtubeKey) {
+      return this.getPlaylistWithYtDlpFallback(listId);
+    }
+
+
     const playlistParams = {
       searchParams: {
         part: 'id, snippet, contentDetails',
@@ -339,6 +344,25 @@ export default class {
     }
 
     return map;
+  }
+
+  private async getPlaylistWithYtDlpFallback(listId: string): Promise<SongMetadata[]> {
+    const result = await getYouTubePlaylist(listId);
+    if (!result?.entries?.length) return [];
+
+    return result.entries
+      .filter(e => e.id && e.title)
+      .map(e => ({
+        source: MediaSource.Youtube,
+        title: e.title,
+        artist: e.uploader ?? '',
+        length: e.duration ?? 0,
+        offset: 0,
+        url: e.id,
+        playlist: {title: result.title, source: listId},
+        isLive: e.is_live ?? false,
+        thumbnailUrl: e.thumbnail ?? null,
+      }));
   }
 
   private async getVideosByID(videoIDs: string[]): Promise<VideoDetailsResponse[]> {
