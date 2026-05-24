@@ -32,6 +32,7 @@ const CONFIG_MAP = {
   YT_DLP_AUTO_UPDATE: process.env.YT_DLP_AUTO_UPDATE === 'true',
   WEB_PASSWORD: process.env.WEB_PASSWORD ?? '',
   WEB_PORT: parseInt(process.env.WEB_PORT ?? '4000', 10),
+  WEB_ONLY_MODE: process.env.WEB_ONLY_MODE === 'true',
 } as const;
 
 const BOT_ACTIVITY_TYPE_MAP = {
@@ -61,6 +62,7 @@ export default class Config {
   readonly YT_DLP_AUTO_UPDATE!: boolean;
   readonly WEB_PASSWORD!: string;
   readonly WEB_PORT!: number;
+  readonly WEB_ONLY_MODE!: boolean;
 
   constructor() {
     for (const [key, value] of Object.entries(CONFIG_MAP)) {

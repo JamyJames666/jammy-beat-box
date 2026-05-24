@@ -102,7 +102,13 @@ export default class WebServer {
           }
           : null,
         position: player.getPosition(),
-        queue: player.getQueue().map(s => ({title: s.title, artist: s.artist, length: s.length})),
+        queue: player.getQueue().map(s => ({
+          title: s.title,
+          artist: s.artist,
+          length: s.length,
+          thumbnailUrl: s.thumbnailUrl,
+          url: s.url,
+        })),
         volume: player.getVolume(),
       });
     });
@@ -137,6 +143,36 @@ export default class WebServer {
     this.app.post('/api/guilds/:guildId/stop', auth, (req: express.Request, res: express.Response) => {
       try {
         this.playerManager.get(req.params.guildId).stop();
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    this.app.post('/api/guilds/:guildId/queue/move', auth, (req: express.Request, res: express.Response) => {
+      const {from, to} = req.body as {from?: number; to?: number};
+      if (typeof from !== 'number' || typeof to !== 'number') {
+        res.status(400).json({error: 'from and to are required'});
+        return;
+      }
+
+      try {
+        this.playerManager.get(req.params.guildId).move(from, to);
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    this.app.post('/api/guilds/:guildId/queue/remove', auth, (req: express.Request, res: express.Response) => {
+      const {index} = req.body as {index?: number};
+      if (typeof index !== 'number') {
+        res.status(400).json({error: 'index is required'});
+        return;
+      }
+
+      try {
+        this.playerManager.get(req.params.guildId).removeFromQueue(index);
         res.json({ok: true});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});

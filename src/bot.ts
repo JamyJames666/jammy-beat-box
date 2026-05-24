@@ -58,6 +58,14 @@ export default class {
     this.client.on('interactionCreate', async interaction => {
       try {
         if (interaction.isCommand()) {
+          if (this.config.WEB_ONLY_MODE) {
+            if (interaction.isChatInputCommand()) {
+              await interaction.reply({content: '🔒 Discord commands are disabled. Use the web dashboard instead.', ephemeral: true});
+            }
+
+            return;
+          }
+
           const command = this.commandsByName.get(interaction.commandName);
 
           if (!command || !interaction.isChatInputCommand()) {
