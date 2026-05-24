@@ -307,10 +307,17 @@
       opt.textContent = `🔊 ${c.name}`;
       chanSel.appendChild(opt);
     });
-    if (channels.length) { channelId = channels[0].id; chanSel.value = channelId; }
+    if (!channels.length) return;
+    const saved = localStorage.getItem(`muse_channel_${gId}`);
+    const match = saved && channels.find(c => c.id === saved);
+    channelId = match ? saved : channels[0].id;
+    chanSel.value = channelId;
   }
 
-  $('channel-select').addEventListener('change', e => { channelId = e.target.value; });
+  $('channel-select').addEventListener('change', e => {
+    channelId = e.target.value;
+    localStorage.setItem(`muse_channel_${guildId}`, channelId);
+  });
 
   $('guild-select').addEventListener('change', async e => {
     guildId = e.target.value;
