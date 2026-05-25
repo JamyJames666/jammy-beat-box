@@ -10,6 +10,8 @@ services:
       - WEB_PASSWORD=${WEB_PASSWORD}
       - WEB_PORT=4000
       - YT_DLP_AUTO_UPDATE=true
+    expose:
+      - "4000"
     volumes:
       - muse-data:/data
 
