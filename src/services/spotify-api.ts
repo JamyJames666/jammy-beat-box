@@ -70,7 +70,7 @@ export default class {
     const {body} = await this.spotify.getArtistTopTracks(uri.id, 'US');
 
     return this.limitTracks(body.tracks, playlistLimit).map(t =>
-      this.toSpotifyTrack(t, t.album?.images?.[0]?.url ?? null),
+      this.toSpotifyTrack(t, (t as SpotifyApi.TrackObjectFull).album?.images?.[0]?.url ?? null),
     );
   }
 
