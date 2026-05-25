@@ -6,7 +6,6 @@ import ffmpeg from 'fluent-ffmpeg';
 import YoutubeAPI from './youtube-api.js';
 import SpotifyAPI, {SpotifyTrack} from './spotify-api.js';
 import {URL} from 'node:url';
-import pLimit from 'p-limit';
 
 @injectable()
 export default class {
@@ -53,7 +52,7 @@ export default class {
           throw new Error('Spotify is not enabled!');
         }
 
-        const [convertedSongs, nSongsNotFound, totalSongs] = await this.spotifySource(query, playlistLimit, shouldSplitChapters);
+        const [convertedSongs, nSongsNotFound, totalSongs] = await this.spotifySource(query, playlistLimit);
 
         if (totalSongs > playlistLimit) {
           extraMsg = `a random sample of ${playlistLimit} songs was taken`;
@@ -111,7 +110,7 @@ export default class {
     return this.youtubeAPI.getPlaylist(listId, shouldSplitChapters);
   }
 
-  private async spotifySource(url: string, playlistLimit: number, shouldSplitChapters: boolean): Promise<[SongMetadata[], number, number]> {
+  private async spotifySource(url: string, playlistLimit: number): Promise<[SongMetadata[], number, number]> {
     if (this.spotifyAPI === undefined) {
       return [[], 0, 0];
     }
@@ -121,22 +120,22 @@ export default class {
     switch (parsed.type) {
       case 'album': {
         const [tracks, playlist] = await this.spotifyAPI.getAlbum(url, playlistLimit);
-        return this.spotifyToYouTube(tracks, shouldSplitChapters, playlist);
+        return this.spotifyToSongMetadata(tracks, playlist);
       }
 
       case 'playlist': {
         const [tracks, playlist] = await this.spotifyAPI.getPlaylist(url, playlistLimit);
-        return this.spotifyToYouTube(tracks, shouldSplitChapters, playlist);
+        return this.spotifyToSongMetadata(tracks, playlist);
       }
 
       case 'track': {
         const tracks = [await this.spotifyAPI.getTrack(url)];
-        return this.spotifyToYouTube(tracks, shouldSplitChapters);
+        return this.spotifyToSongMetadata(tracks);
       }
 
       case 'artist': {
         const tracks = await this.spotifyAPI.getArtist(url, playlistLimit);
-        return this.spotifyToYouTube(tracks, shouldSplitChapters);
+        return this.spotifyToSongMetadata(tracks);
       }
 
       default: {
@@ -167,29 +166,18 @@ export default class {
     });
   }
 
-  private async spotifyToYouTube(tracks: SpotifyTrack[], shouldSplitChapters: boolean, playlist?: QueuedPlaylist | undefined): Promise<[SongMetadata[], number, number]> {
-    const limit = pLimit(4);
-    const promisedResults = tracks.map(track => limit(() => this.youtubeAPI.search(`"${track.name}" "${track.artist}"`, shouldSplitChapters)));
-    const searchResults = await Promise.allSettled(promisedResults);
-
-    let nSongsNotFound = 0;
-
-    // Count songs that couldn't be found
-    const songs: SongMetadata[] = searchResults.reduce((accum: SongMetadata[], result) => {
-      if (result.status === 'fulfilled') {
-        for (const v of result.value) {
-          accum.push({
-            ...v,
-            ...(playlist ? {playlist} : {}),
-          });
-        }
-      } else {
-        nSongsNotFound++;
-      }
-
-      return accum;
-    }, []);
-
-    return [songs, nSongsNotFound, tracks.length];
+  private spotifyToSongMetadata(tracks: SpotifyTrack[], playlist?: QueuedPlaylist): [SongMetadata[], number, number] {
+    const songs: SongMetadata[] = tracks.map(track => ({
+      source: MediaSource.Youtube,
+      title: track.name,
+      artist: track.artist,
+      url: `ytsearch1:"${track.name}" "${track.artist}"`,
+      length: track.durationSeconds,
+      offset: 0,
+      playlist: playlist ?? null,
+      isLive: false,
+      thumbnailUrl: track.thumbnailUrl,
+    }));
+    return [songs, 0, tracks.length];
   }
 }

@@ -558,7 +558,13 @@ export default class {
         });
       }
 
-      // Seek: need a URL with -ss; piped stream doesn't support seeking
+      // Seek: need a URL with -ss; piped stream doesn't support seeking.
+      // ytsearch1: URLs can't be resolved to a seekable CDN URL — pipe from start instead.
+      if (song.url.startsWith('ytsearch')) {
+        const {stream: ytdlpStream, kill: ytdlpKill} = createYtDlpAudioStream(song.url);
+        return this.createReadStream({input: ytdlpStream, ytdlpKill, cacheKey: song.url, cache: false});
+      }
+
       const mediaSource = await getYouTubeMediaSource(song.url);
       ffmpegInput = mediaSource.url;
       ffmpegInputOptions.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');

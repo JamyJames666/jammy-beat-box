@@ -10,6 +10,8 @@ import {QueuedPlaylist} from './player.js';
 export interface SpotifyTrack {
   name: string;
   artist: string;
+  durationSeconds: number;
+  thumbnailUrl: string | null;
 }
 
 @injectable()
@@ -23,7 +25,8 @@ export default class {
   async getAlbum(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Album;
     const [{body: album}, {body: {items}}] = await Promise.all([this.spotify.getAlbum(uri.id), this.spotify.getAlbumTracks(uri.id, {limit: 50})]);
-    const tracks = this.limitTracks(items, playlistLimit).map(this.toSpotifyTrack);
+    const albumThumbnail = album.images[0]?.url ?? null;
+    const tracks = this.limitTracks(items, playlistLimit).map(t => this.toSpotifyTrack(t, albumThumbnail));
     const playlist = {title: album.name, source: album.href};
 
     return [tracks, playlist];
@@ -47,7 +50,10 @@ export default class {
       items.push(...tracksResponse.items.map(playlistItem => playlistItem.track));
     }
 
-    const tracks = this.limitTracks(items.filter(i => i !== null) as SpotifyApi.TrackObjectSimplified[], playlistLimit).map(this.toSpotifyTrack);
+    const tracks = this.limitTracks(items.filter(i => i !== null) as SpotifyApi.TrackObjectSimplified[], playlistLimit).map(t => {
+      const thumbnail = (t as SpotifyApi.TrackObjectFull).album?.images?.[0]?.url ?? null;
+      return this.toSpotifyTrack(t, thumbnail);
+    });
 
     return [tracks, playlist];
   }
@@ -56,20 +62,24 @@ export default class {
     const uri = spotifyURI.parse(url) as spotifyURI.Track;
     const {body} = await this.spotify.getTrack(uri.id);
 
-    return this.toSpotifyTrack(body);
+    return this.toSpotifyTrack(body, body.album?.images?.[0]?.url ?? null);
   }
 
   async getArtist(url: string, playlistLimit: number): Promise<SpotifyTrack[]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Artist;
     const {body} = await this.spotify.getArtistTopTracks(uri.id, 'US');
 
-    return this.limitTracks(body.tracks, playlistLimit).map(this.toSpotifyTrack);
+    return this.limitTracks(body.tracks, playlistLimit).map(t =>
+      this.toSpotifyTrack(t, t.album?.images?.[0]?.url ?? null),
+    );
   }
 
-  private toSpotifyTrack(track: SpotifyApi.TrackObjectSimplified): SpotifyTrack {
+  private toSpotifyTrack(track: SpotifyApi.TrackObjectSimplified, thumbnailUrl: string | null = null): SpotifyTrack {
     return {
       name: track.name,
       artist: track.artists[0].name,
+      durationSeconds: Math.round((track.duration_ms ?? 0) / 1000),
+      thumbnailUrl,
     };
   }
 
