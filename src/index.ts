@@ -23,7 +23,12 @@ const startBot = async () => {
 
   container.get<WebServer>(TYPES.WebServer).start();
 
-  await bot.register();
+  try {
+    await bot.register();
+  } catch (error: unknown) {
+    console.error('Discord connection failed:', (error as Error).message);
+    console.error('Web dashboard remains available. Bot will not retry until restart.');
+  }
 };
 
 export {startBot};
