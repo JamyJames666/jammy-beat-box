@@ -22,6 +22,7 @@ export default class {
     let extraMsg = '';
 
     // Test if it's a complete URL
+    let isSpotifyUrl = false;
     try {
       const url = new URL(query);
 
@@ -48,6 +49,8 @@ export default class {
           }
         }
       } else if (url.protocol === 'spotify:' || url.host === 'open.spotify.com') {
+        isSpotifyUrl = true;
+
         if (this.spotifyAPI === undefined) {
           throw new Error('Spotify is not enabled!');
         }
@@ -81,7 +84,8 @@ export default class {
         }
       }
     } catch (err: any) {
-      if (err instanceof Error && err.message === 'Spotify is not enabled!') {
+      // Never fall back to YouTube search for Spotify URLs — surface the real error
+      if (isSpotifyUrl) {
         throw err;
       }
 
