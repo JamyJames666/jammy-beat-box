@@ -86,7 +86,7 @@ export default class {
     };
   }
 
-  private limitTracks(tracks: SpotifyApi.TrackObjectSimplified[], limit: number) {
+  private limitTracks<T>(tracks: T[], limit: number): T[] {
     return tracks.length > limit ? shuffle(tracks).slice(0, limit) : tracks;
   }
 }
