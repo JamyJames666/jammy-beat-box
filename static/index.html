@@ -186,6 +186,7 @@
       <div class="queue-header">
         <h2>Queue</h2>
         <span class="queue-count" id="queue-count"></span>
+        <button class="btn-icon" id="shuffle-btn" title="Shuffle queue" style="margin-left:auto">⇄ Shuffle</button>
       </div>
       <ul class="queue-list" id="queue-list"></ul>
       <p class="queue-empty" id="queue-empty" style="display:none">Queue is empty.</p>
@@ -473,6 +474,7 @@
   });
   $('skip-btn').addEventListener('click', async () => { await api('POST', `/api/guilds/${guildId}/skip`); poll(); });
   $('stop-btn').addEventListener('click', async () => { await api('POST', `/api/guilds/${guildId}/stop`); poll(); });
+  $('shuffle-btn').addEventListener('click', async () => { await api('POST', `/api/guilds/${guildId}/queue/shuffle`); poll(); });
 
   $('vol-slider').addEventListener('input', e => { $('vol-display').textContent = e.target.value; });
   $('vol-slider').addEventListener('change', async e => {

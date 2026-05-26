@@ -465,6 +465,11 @@ export default class {
     this.queue.splice(this.queuePosition + index, amount);
   }
 
+  shuffleQueue(): void {
+    const upcoming = this.queue.splice(this.queuePosition + 1);
+    this.queue.push(...shuffle(upcoming));
+  }
+
   removeCurrent(): void {
     this.queue = [...this.queue.slice(0, this.queuePosition), ...this.queue.slice(this.queuePosition + 1)];
   }
