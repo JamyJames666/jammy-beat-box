@@ -37,7 +37,10 @@ export default class {
 
     let [{body: playlistResponse}, {body: tracksResponse}] = await Promise.all([this.spotify.getPlaylist(uri.id), this.spotify.getPlaylistTracks(uri.id, {limit: 50})]);
 
-    const items = tracksResponse.items.map(playlistItem => playlistItem.track);
+    const onlyTracks = (items: Array<SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject | null>) =>
+      items.filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t.type === 'track');
+
+    const items = onlyTracks(tracksResponse.items.map(i => i.track));
     const playlist = {title: playlistResponse.name, source: playlistResponse.href};
 
     while (tracksResponse.next) {
@@ -47,11 +50,11 @@ export default class {
         offset: parseInt(new URL(tracksResponse.next).searchParams.get('offset') ?? '0', 10),
       }));
 
-      items.push(...tracksResponse.items.map(playlistItem => playlistItem.track));
+      items.push(...onlyTracks(tracksResponse.items.map(i => i.track)));
     }
 
-    const tracks = this.limitTracks(items.filter(i => i !== null) as SpotifyApi.TrackObjectSimplified[], playlistLimit).map(t => {
-      const thumbnail = (t as SpotifyApi.TrackObjectFull).album?.images?.[0]?.url ?? null;
+    const tracks = this.limitTracks(items, playlistLimit).map(t => {
+      const thumbnail = t.album?.images?.[0]?.url ?? null;
       return this.toSpotifyTrack(t, thumbnail);
     });
 
