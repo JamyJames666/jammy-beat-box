@@ -337,13 +337,24 @@ export const createYtDlpAudioStream = (videoIdOrUrl: string): YtDlpStream => {
   };
 };
 
-interface YtDlpSearchResult {
+export interface YtDlpSearchResult {
   readonly id: string;
   readonly title: string;
   readonly uploader: string;
   readonly duration: number;
   readonly thumbnail: string;
   readonly is_live: boolean;
+}
+
+interface YtDlpRawSearchResult {
+  id?: string;
+  title?: string;
+  uploader?: string;
+  duration?: number;
+  thumbnail?: string;
+  is_live?: boolean;
+  _type?: string;
+  entries?: YtDlpRawSearchResult[];
 }
 
 interface YtDlpPlaylistEntry {
@@ -376,6 +387,26 @@ export const getYouTubePlaylist = async (playlistId: string): Promise<YtDlpPlayl
   }
 };
 
+const extractFirstSearchResult = (raw: YtDlpRawSearchResult): YtDlpSearchResult | null => {
+  // Newer yt-dlp versions sometimes return {"_type":"playlist","entries":[...]} for ytsearch1:
+  const video: YtDlpRawSearchResult | undefined = raw._type === 'playlist'
+    ? raw.entries?.[0]
+    : raw;
+
+  if (!video?.id) {
+    return null;
+  }
+
+  return {
+    id: video.id,
+    title: video.title ?? '',
+    uploader: video.uploader ?? '',
+    duration: video.duration ?? 0,
+    thumbnail: video.thumbnail ?? '',
+    is_live: video.is_live ?? false,
+  };
+};
+
 export const searchWithYtDlp = async (query: string): Promise<YtDlpSearchResult | null> => {
   try {
     const {stdout} = await execa(getExecutable(), [
@@ -389,7 +420,8 @@ export const searchWithYtDlp = async (query: string): Promise<YtDlpSearchResult 
       timeout: YT_DLP_EXTRACT_TIMEOUT_MS,
     });
 
-    return JSON.parse(stdout) as YtDlpSearchResult;
+    const raw = JSON.parse(stdout) as YtDlpRawSearchResult;
+    return extractFirstSearchResult(raw);
   } catch {
     return null;
   }

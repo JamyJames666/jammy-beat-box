@@ -9,11 +9,25 @@ import {TYPES} from '../types.js';
 import Config from './config.js';
 import PlayerManager from '../managers/player.js';
 import GetSongs from './get-songs.js';
-import {STATUS} from './player.js';
+import {STATUS, MediaSource} from './player.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/**
+ * Detect whether a queued song originated from Spotify or YouTube.
+ * Spotify songs use Spotify CDN thumbnails (i.scdn.co) or have a Spotify
+ * API URL as their playlist source. Everything else is treated as YouTube.
+ */
+const songSourceLabel = (song: {thumbnailUrl: string | null; playlist: {source: string} | null}): 'spotify' | 'youtube' => {
+  if (song.thumbnailUrl?.includes('scdn.co')) return 'spotify';
+  if (song.playlist?.source && (song.playlist.source.includes('spotify') || song.playlist.source.includes('api.spotify'))) {
+    return 'spotify';
+  }
+
+  return 'youtube';
+};
 
 @injectable()
 export default class WebServer {
@@ -162,6 +176,7 @@ export default class WebServer {
             length: current.length,
             thumbnailUrl: current.thumbnailUrl,
             url: current.url,
+            source: songSourceLabel(current),
           }
           : null,
         position: player.getPosition(),
@@ -171,6 +186,7 @@ export default class WebServer {
           length: s.length,
           thumbnailUrl: s.thumbnailUrl,
           url: s.url,
+          source: songSourceLabel(s),
         })),
         volume: player.getVolume(),
       });

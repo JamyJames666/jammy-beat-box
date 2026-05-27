@@ -175,7 +175,9 @@ export default class {
       source: MediaSource.Youtube,
       title: track.name,
       artist: track.artist,
-      url: `ytsearch1:"${track.name}" "${track.artist}"`,
+      // Use unquoted search — exact-phrase quoting breaks on special characters in
+      // track/artist names and some yt-dlp versions mis-parse the nested quotes.
+      url: `ytsearch1:${track.name} ${track.artist}`,
       length: track.durationSeconds,
       offset: 0,
       playlist: playlist ?? null,

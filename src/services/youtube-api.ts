@@ -361,7 +361,9 @@ export default class {
         url: e.id,
         playlist: {title: result.title, source: listId},
         isLive: e.is_live ?? false,
-        thumbnailUrl: e.thumbnail ?? null,
+        // --flat-playlist often omits thumbnails; fall back to the guaranteed
+        // YouTube thumbnail URL so every queue entry has an image.
+        thumbnailUrl: e.thumbnail ?? `https://i.ytimg.com/vi/${e.id}/mqdefault.jpg`,
       }));
   }
 

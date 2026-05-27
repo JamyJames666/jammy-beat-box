@@ -96,17 +96,30 @@
     .queue-item {
       display: flex; align-items: center; gap: 0.75rem;
       background: var(--surface2); border-radius: 8px; padding: 0.5rem 0.75rem;
-      transition: background 0.1s;
+      transition: background 0.1s, opacity 0.1s, border 0.1s;
+      cursor: grab; border: 1px solid transparent;
     }
     .queue-item:hover { background: var(--border); }
+    .queue-item.dragging { opacity: 0.4; cursor: grabbing; }
+    .queue-item.drag-over { border-color: var(--accent); background: var(--surface2); }
+    .q-drag-handle { color: var(--muted); font-size: 1rem; flex-shrink: 0; user-select: none; line-height: 1; padding: 0 2px; }
     .q-thumb { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; flex-shrink: 0; background: var(--border); }
     .q-thumb-placeholder { width: 40px; height: 40px; border-radius: 4px; background: var(--border); display: flex; align-items: center; justify-content: center; font-size: 1rem; color: var(--muted); flex-shrink: 0; }
     .q-info { flex: 1; min-width: 0; }
     .q-title { font-size: 0.88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q-meta { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.15rem; }
     .q-artist { font-size: 0.75rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .source-badge {
+      font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+      padding: 0.1rem 0.35rem; border-radius: 3px; flex-shrink: 0; line-height: 1.4;
+    }
+    .source-badge.yt { background: #ff0000; color: #fff; }
+    .source-badge.sp { background: #1db954; color: #fff; }
     .q-dur { color: var(--muted); font-size: 0.78rem; flex-shrink: 0; margin-right: 0.25rem; }
     .q-actions { display: flex; gap: 0.25rem; flex-shrink: 0; }
     .queue-empty { color: var(--muted); font-size: 0.9rem; }
+    /* Now-playing source badge */
+    .np-source { display: inline-block; margin-left: 0.4rem; vertical-align: middle; }
 
     /* SEARCH */
     .tab-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
@@ -164,7 +177,7 @@
           </div>
           <div class="song-info">
             <div class="song-title" id="song-title">—</div>
-            <div class="song-artist" id="song-artist">—</div>
+            <div class="song-artist" id="song-artist">—<span class="source-badge np-source" id="np-source-badge" style="display:none"></span></div>
             <div class="progress-wrap">
               <div class="progress-bar" id="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
               <div class="time-row"><span id="pos-time">0:00</span><span id="dur-time">0:00</span></div>
@@ -390,6 +403,16 @@
       $('song-title').textContent = s.nowPlaying.title;
       $('song-artist').textContent = s.nowPlaying.artist;
 
+      const npBadge = $('np-source-badge');
+      if (s.nowPlaying.source) {
+        const isSpotify = s.nowPlaying.source === 'spotify';
+        npBadge.className = `source-badge np-source ${isSpotify ? 'sp' : 'yt'}`;
+        npBadge.textContent = isSpotify ? 'Spotify' : 'YouTube';
+        npBadge.style.display = '';
+      } else {
+        npBadge.style.display = 'none';
+      }
+
       const thumb = $('thumb');
       if (s.nowPlaying.thumbnailUrl) {
         thumb.src = s.nowPlaying.thumbnailUrl;
@@ -414,6 +437,8 @@
     renderQueue(s.queue ?? []);
   }
 
+  let dragSrcIndex = -1;
+
   function renderQueue(queue) {
     const list = $('queue-list');
     list.innerHTML = '';
@@ -428,36 +453,76 @@
     queue.forEach((item, i) => {
       const li = document.createElement('li');
       li.className = 'queue-item';
+      li.draggable = true;
+      li.dataset.i = i;
 
       const thumbEl = item.thumbnailUrl
-        ? `<img class="q-thumb" src="${esc(item.thumbnailUrl)}" alt="" loading="lazy">`
+        ? `<img class="q-thumb" src="${esc(item.thumbnailUrl)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+          + `<div class="q-thumb-placeholder" style="display:none">♪</div>`
         : `<div class="q-thumb-placeholder">♪</div>`;
 
+      const srcLabel = item.source === 'spotify' ? 'sp' : 'yt';
+      const srcText  = item.source === 'spotify' ? 'Spotify' : 'YouTube';
+      const sourceBadge = `<span class="source-badge ${srcLabel}" title="${srcText}">${srcText}</span>`;
+
       li.innerHTML = `
+        <span class="q-drag-handle" title="Drag to reorder">⠿</span>
         ${thumbEl}
         <div class="q-info">
           <div class="q-title">${esc(item.title)}</div>
-          <div class="q-artist">${esc(item.artist ?? '')}</div>
+          <div class="q-meta">
+            <span class="q-artist">${esc(item.artist ?? '')}</span>
+            ${sourceBadge}
+          </div>
         </div>
         <span class="q-dur">${fmt(item.length)}</span>
         <div class="q-actions">
-          ${i > 0 ? `<button class="btn-icon" data-action="up" data-i="${i}" title="Move up">↑</button>` : ''}
-          ${i < queue.length - 1 ? `<button class="btn-icon" data-action="down" data-i="${i}" title="Move down">↓</button>` : ''}
           <button class="btn-icon danger" data-action="remove" data-i="${i}" title="Remove">✕</button>
         </div>`;
+
+      // ---- Drag-and-drop ----
+      li.addEventListener('dragstart', e => {
+        dragSrcIndex = i;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(i));
+        setTimeout(() => li.classList.add('dragging'), 0);
+      });
+
+      li.addEventListener('dragend', () => {
+        li.classList.remove('dragging');
+        list.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
+      });
+
+      li.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        list.querySelectorAll('.queue-item').forEach(el => el.classList.remove('drag-over'));
+        li.classList.add('drag-over');
+      });
+
+      li.addEventListener('dragleave', () => li.classList.remove('drag-over'));
+
+      li.addEventListener('drop', async e => {
+        e.preventDefault();
+        li.classList.remove('drag-over');
+        const toIdx = parseInt(li.dataset.i, 10);
+        if (dragSrcIndex !== -1 && dragSrcIndex !== toIdx) {
+          // API uses 1-based offsets relative to queue start (current song = 0)
+          await api('POST', `/api/guilds/${guildId}/queue/move`, {from: dragSrcIndex + 1, to: toIdx + 1});
+          poll();
+        }
+        dragSrcIndex = -1;
+      });
+
       list.appendChild(li);
     });
 
+    // Remove button handler (event delegation)
     list.addEventListener('click', async e => {
-      const btn = e.target.closest('[data-action]');
+      const btn = e.target.closest('[data-action="remove"]');
       if (!btn) return;
       const idx = parseInt(btn.dataset.i, 10);
-      const action = btn.dataset.action;
-
-      if (action === 'up') await api('POST', `/api/guilds/${guildId}/queue/move`, {from: idx + 1, to: idx});
-      else if (action === 'down') await api('POST', `/api/guilds/${guildId}/queue/move`, {from: idx + 1, to: idx + 2});
-      else if (action === 'remove') await api('POST', `/api/guilds/${guildId}/queue/remove`, {index: idx + 1});
-
+      await api('POST', `/api/guilds/${guildId}/queue/remove`, {index: idx + 1});
       poll();
     }, {once: true});
   }
