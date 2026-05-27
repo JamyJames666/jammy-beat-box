@@ -141,45 +141,10 @@ export default class {
     return this.getMetadataFromVideo({video, shouldSplitChapters});
   }
 
-  private async searchWithYtDlpFallback(query: string): Promise<SongMetadata[]> {
-    const result = await searchWithYtDlp(query);
-    if (!result) return [];
-
-    return [{
-      source: MediaSource.Youtube,
-      title: result.title,
-      artist: result.uploader,
-      length: result.duration,
-      offset: 0,
-      url: result.id,
-      playlist: null,
-      isLive: result.is_live,
-      thumbnailUrl: result.thumbnail,
-    }];
-  }
-
-  private async getVideoWithYtDlpFallback(videoId: string): Promise<SongMetadata[]> {
-    const result = await searchWithYtDlp(`https://www.youtube.com/watch?v=${videoId}`);
-    if (!result) throw new Error('Video could not be found.');
-
-    return [{
-      source: MediaSource.Youtube,
-      title: result.title,
-      artist: result.uploader,
-      length: result.duration,
-      offset: 0,
-      url: result.id,
-      playlist: null,
-      isLive: result.is_live,
-      thumbnailUrl: result.thumbnail,
-    }];
-  }
-
   async getPlaylist(listId: string, shouldSplitChapters: boolean): Promise<SongMetadata[]> {
     if (!this.youtubeKey) {
       return this.getPlaylistWithYtDlpFallback(listId);
     }
-
 
     const playlistParams = {
       searchParams: {
@@ -257,6 +222,44 @@ export default class {
     }
 
     return songsToReturn;
+  }
+
+  private async searchWithYtDlpFallback(query: string): Promise<SongMetadata[]> {
+    const result = await searchWithYtDlp(query);
+    if (!result) {
+      return [];
+    }
+
+    return [{
+      source: MediaSource.Youtube,
+      title: result.title,
+      artist: result.uploader,
+      length: result.duration,
+      offset: 0,
+      url: result.id,
+      playlist: null,
+      isLive: result.is_live,
+      thumbnailUrl: result.thumbnail,
+    }];
+  }
+
+  private async getVideoWithYtDlpFallback(videoId: string): Promise<SongMetadata[]> {
+    const result = await searchWithYtDlp(`https://www.youtube.com/watch?v=${videoId}`);
+    if (!result) {
+      throw new Error('Video could not be found.');
+    }
+
+    return [{
+      source: MediaSource.Youtube,
+      title: result.title,
+      artist: result.uploader,
+      length: result.duration,
+      offset: 0,
+      url: result.id,
+      playlist: null,
+      isLive: result.is_live,
+      thumbnailUrl: result.thumbnail,
+    }];
   }
 
   private getMetadataFromVideo({
@@ -348,7 +351,9 @@ export default class {
 
   private async getPlaylistWithYtDlpFallback(listId: string): Promise<SongMetadata[]> {
     const result = await getYouTubePlaylist(listId);
-    if (!result?.entries?.length) return [];
+    if (!result?.entries?.length) {
+      return [];
+    }
 
     return result.entries
       .filter(e => e.id && e.title)

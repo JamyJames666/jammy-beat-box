@@ -2,7 +2,7 @@ import {URL} from 'url';
 import {inject, injectable} from 'inversify';
 import * as spotifyURI from 'spotify-uri';
 import Spotify from 'spotify-web-api-node';
-import got from 'got';
+import type {Track as SpotifyUrlInfoTrack} from 'spotify-url-info';
 import {TYPES} from '../types.js';
 import ThirdParty from './third-party.js';
 import shuffle from 'array-shuffle';
@@ -39,7 +39,7 @@ export default class {
     // ── Attempt 1: Spotify Web API (Client Credentials) ────────────────────
     // Use loose != null so both null and undefined track entries are filtered.
     const onlyTracks = (items: Array<SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject | null | undefined>) =>
-      items.filter((t): t is SpotifyApi.TrackObjectFull => t != null && t.type === 'track');
+      items.filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t !== undefined && t.type === 'track');
 
     try {
       let playlistTitle: string;
@@ -79,86 +79,9 @@ export default class {
 
       return [this.limitTracks(items, playlistLimit).map(t => this.toSpotifyTrack(t, t.album?.images?.[0]?.url ?? null)), playlist];
     } catch {
-      // ── Attempt 2: Spotify anonymous web-player token ───────────────────────
-      // Spotify's own web player fetches a guest token from this endpoint for
-      // every unauthenticated page load. It grants read access to public
-      // playlist data via the official API without requiring OAuth or a
-      // registered Spotify app with elevated quotas.
-      return this.getPlaylistViaWebToken(uri.id, url, playlistLimit);
+      // ── Attempt 2: spotify-url-info (scrapes Spotify web player, no auth) ──
+      return this.getPlaylistViaUrlInfo(url, playlistLimit);
     }
-  }
-
-  /**
-   * Fetch a public Spotify playlist using the anonymous guest token that
-   * Spotify's web player issues to unauthenticated visitors.
-   * Endpoint: https://open.spotify.com/get_access_token?reason=transport&productType=web_player
-   */
-  private async getPlaylistViaWebToken(playlistId: string, originalUrl: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
-    // 1. Obtain anonymous guest token
-    const tokenResp = await got('https://open.spotify.com/get_access_token?reason=transport&productType=web_player', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-      },
-      timeout: {request: 10_000},
-    }).json<{accessToken?: string}>();
-
-    const token = tokenResp.accessToken;
-    if (!token) {
-      throw new Error('Could not obtain Spotify anonymous token — the playlist may be private.');
-    }
-
-    // Types for the raw API responses we care about
-    interface RawTrack {
-      name: string;
-      type: string;
-      duration_ms: number;
-      artists: Array<{name: string}>;
-      album: {name: string; images: Array<{url: string}>};
-    }
-
-    interface TracksPage {
-      items: Array<{track: RawTrack | null}>;
-      next: string | null;
-    }
-
-    interface PlaylistMeta {
-      name: string;
-      href: string;
-    }
-
-    const headers = {Authorization: `Bearer ${token}`};
-
-    // 2. Fetch playlist name + first track page in parallel
-    const [meta, firstPage] = await Promise.all([
-      got(`https://api.spotify.com/v1/playlists/${playlistId}?fields=name,href`, {headers}).json<PlaylistMeta>(),
-      got(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, {headers}).json<TracksPage>(),
-    ]);
-
-    const rawItems = [...firstPage.items];
-    let nextUrl = firstPage.next;
-    while (nextUrl) {
-      // eslint-disable-next-line no-await-in-loop
-      const page = await got(nextUrl, {headers}).json<TracksPage>();
-      rawItems.push(...page.items);
-      nextUrl = page.next;
-    }
-
-    const tracks: SpotifyTrack[] = rawItems
-      .filter(i => i.track !== null && i.track.type === 'track')
-      .map(i => ({
-        name: i.track!.name,
-        artist: i.track!.artists[0]?.name ?? '',
-        durationSeconds: Math.round((i.track!.duration_ms ?? 0) / 1000),
-        thumbnailUrl: i.track!.album.images[0]?.url ?? null,
-      }));
-
-    if (tracks.length === 0) {
-      throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
-    }
-
-    const playlist = {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? originalUrl};
-    return [this.limitTracks(tracks, playlistLimit), playlist];
   }
 
   async getTrack(url: string): Promise<SpotifyTrack> {
@@ -173,8 +96,42 @@ export default class {
     const {body} = await this.spotify.getArtistTopTracks(uri.id, 'US');
 
     return this.limitTracks(body.tracks, playlistLimit).map(t =>
-      this.toSpotifyTrack(t, (t as SpotifyApi.TrackObjectFull).album?.images?.[0]?.url ?? null),
+      this.toSpotifyTrack(t, (t).album?.images?.[0]?.url ?? null),
     );
+  }
+
+  private async getPlaylistViaUrlInfo(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
+    // The package's default export is declared as an interface (type-only in TS)
+    // but at runtime it is a callable factory function.
+    type UrlInfoFactory = (f: typeof fetch) => {
+      getData: (url: string) => Promise<{name?: string}>;
+      getTracks: (url: string) => Promise<SpotifyUrlInfoTrack[]>;
+    };
+    const mod = await import('spotify-url-info') as unknown as {default: UrlInfoFactory};
+    const {getData, getTracks} = mod.default(fetch);
+
+    const [data, rawTracks] = await Promise.all([
+      getData(url) as Promise<{name?: string; trackList?: unknown[]}>,
+      getTracks(url) as Promise<Array<{name: string; artist: string; duration: number}>>,
+    ]);
+
+    if (!rawTracks || rawTracks.length === 0) {
+      throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
+    }
+
+    const tracks: SpotifyTrack[] = rawTracks.map(t => ({
+      name: t.name,
+      artist: t.artist ?? '',
+      durationSeconds: Math.round((t.duration ?? 0) / 1000),
+      thumbnailUrl: null,
+    }));
+
+    const playlist = {
+      title: (data as {name?: string}).name ?? 'Spotify Playlist',
+      source: url,
+    };
+
+    return [this.limitTracks(tracks, playlistLimit), playlist];
   }
 
   private toSpotifyTrack(track: SpotifyApi.TrackObjectSimplified, thumbnailUrl: string | null = null): SpotifyTrack {

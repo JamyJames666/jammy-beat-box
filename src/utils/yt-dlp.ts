@@ -317,13 +317,16 @@ export interface YtDlpStream {
 
 export const createYtDlpAudioStream = (videoIdOrUrl: string): YtDlpStream => {
   const proc = execa(getExecutable(), [
-    '--format', 'bestaudio',
-    '--output', '-',
+    '--format',
+    'bestaudio',
+    '--output',
+    '-',
     '--no-playlist',
     '--quiet',
     '--no-warnings',
     '--no-cache-dir',
-    '--extractor-args', `youtube:player_client=${PLAYER_CLIENT_ATTEMPTS[0]}`,
+    '--extractor-args',
+    `youtube:player_client=${PLAYER_CLIENT_ATTEMPTS[0]}`,
     toYouTubeWatchUrl(videoIdOrUrl),
   ], {buffer: false});
 
@@ -333,7 +336,9 @@ export const createYtDlpAudioStream = (videoIdOrUrl: string): YtDlpStream => {
 
   return {
     stream: proc.stdout as unknown as Readable,
-    kill: () => { proc.kill('SIGKILL'); },
+    kill: () => {
+      proc.kill('SIGKILL');
+    },
   };
 };
 

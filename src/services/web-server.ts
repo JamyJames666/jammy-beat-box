@@ -23,7 +23,10 @@ const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
  * API URL as their playlist source. Everything else is treated as YouTube.
  */
 const songSourceLabel = (song: {thumbnailUrl: string | null; playlist: {source: string} | null}): 'spotify' | 'youtube' => {
-  if (song.thumbnailUrl?.includes('scdn.co')) return 'spotify';
+  if (song.thumbnailUrl?.includes('scdn.co')) {
+    return 'spotify';
+  }
+
   if (song.playlist?.source && (song.playlist.source.includes('spotify') || song.playlist.source.includes('api.spotify'))) {
     return 'spotify';
   }
@@ -72,11 +75,16 @@ const pickWebMessage = (count: number, first: string): string => {
  */
 const findAnnouncementChannel = async (client: Client, guildId: string): Promise<TextChannel | null> => {
   const guild = client.guilds.cache.get(guildId);
-  if (!guild) return null;
+  if (!guild) {
+    return null;
+  }
 
   const botId = client.user?.id;
   const canSend = (ch: TextChannel) => {
-    if (!botId) return true;
+    if (!botId) {
+      return true;
+    }
+
     const perms = ch.permissionsFor(botId);
     return Boolean(perms?.has('SendMessages') && perms?.has('ViewChannel'));
   };
@@ -85,8 +93,8 @@ const findAnnouncementChannel = async (client: Client, guildId: string): Promise
   const settings = await getGuildSettings(guildId);
   if (settings.announcementChannelId) {
     const stored = guild.channels.cache.get(settings.announcementChannelId);
-    if (stored?.type === ChannelType.GuildText && canSend(stored as TextChannel)) {
-      return stored as TextChannel;
+    if (stored?.type === ChannelType.GuildText && canSend(stored)) {
+      return stored;
     }
   }
 
@@ -94,9 +102,11 @@ const findAnnouncementChannel = async (client: Client, guildId: string): Promise
   const musicBot = guild.channels.cache.find(
     c => c.type === ChannelType.GuildText
       && c.name.toLowerCase() === 'musicbot'
-      && canSend(c as TextChannel),
+      && canSend(c),
   );
-  if (musicBot) return musicBot as TextChannel;
+  if (musicBot) {
+    return musicBot as TextChannel;
+  }
 
   // 3. Guild system channel
   if (guild.systemChannel && canSend(guild.systemChannel)) {
@@ -153,7 +163,7 @@ export default class WebServer {
       }
 
       if (!record || now >= record.resetAt) {
-        loginAttempts.set(ip, {count: 1, resetAt: now + 15 * 60 * 1000});
+        loginAttempts.set(ip, {count: 1, resetAt: now + (15 * 60 * 1000)});
       } else {
         record.count++;
       }
@@ -165,7 +175,9 @@ export default class WebServer {
       }
 
       const entry = loginAttempts.get(ip);
-      if (entry) entry.count = 0;
+      if (entry) {
+        entry.count = 0;
+      }
 
       res.json({token: this.generateToken()});
     });
@@ -210,9 +222,15 @@ export default class WebServer {
       const botId = this.client.user?.id;
       const channels = guild.channels.cache
         .filter(c => {
-          if (c.type !== ChannelType.GuildText) return false;
-          if (!botId) return true;
-          const perms = (c as TextChannel).permissionsFor(botId);
+          if (c.type !== ChannelType.GuildText) {
+            return false;
+          }
+
+          if (!botId) {
+            return true;
+          }
+
+          const perms = (c).permissionsFor(botId);
           return Boolean(perms?.has('SendMessages') && perms?.has('ViewChannel'));
         })
         .map(c => ({id: c.id, name: c.name}));
@@ -228,7 +246,7 @@ export default class WebServer {
     this.app.post('/api/guilds/:guildId/settings/announcement', auth, async (req: express.Request, res: express.Response) => {
       const {channelId} = req.body as {channelId?: string | null};
 
-      // channelId = null means "reset to auto-detect"
+      // ChannelId = null means "reset to auto-detect"
       try {
         await prisma.setting.upsert({
           where: {guildId: req.params.guildId},
@@ -437,7 +455,9 @@ export default class WebServer {
     try {
       const decoded = Buffer.from(token, 'base64url').toString();
       const dotIndex = decoded.lastIndexOf('.');
-      if (dotIndex < 0) return false;
+      if (dotIndex < 0) {
+        return false;
+      }
 
       const timestamp = decoded.slice(0, dotIndex);
       const sig = decoded.slice(dotIndex + 1);
