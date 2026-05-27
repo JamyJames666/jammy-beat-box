@@ -22,7 +22,7 @@ import FileCacheProvider from './file-cache.js';
 import debug from '../utils/debug.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
-import {getYouTubeMediaSource, createYtDlpAudioStream} from '../utils/yt-dlp.js';
+import {getYouTubeMediaSource, createYtDlpAudioStream, searchWithYtDlp} from '../utils/yt-dlp.js';
 import {Setting} from '@prisma/client';
 
 export enum MediaSource {
@@ -548,6 +548,17 @@ export default class {
     ffmpegInput = await this.fileCache.getPathFor(this.getHashForCache(song.url));
 
     if (!ffmpegInput) {
+      // Resolve ytsearch1: queries to a real YouTube video ID first so errors surface properly
+      if (song.url.startsWith('ytsearch1:')) {
+        const query = song.url.slice('ytsearch1:'.length);
+        const result = await searchWithYtDlp(query);
+        if (!result?.id) {
+          throw new Error(`Could not find a YouTube match for: ${song.title}`);
+        }
+
+        song.url = result.id;
+      }
+
       const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes
 
       if (!options.seek) {
