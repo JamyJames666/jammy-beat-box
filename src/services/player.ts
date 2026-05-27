@@ -563,8 +563,12 @@ export default class {
 
   private async getStream(song: QueuedSong, options: {seek?: number; to?: number} = {}): Promise<Readable> {
     if (this.status === STATUS.PLAYING) {
+      // Remove listeners BEFORE stopping so the Idle event on the old player
+      // does not fire onAudioPlayerIdle and trigger an unintended extra forward().
+      this.audioPlayer?.removeAllListeners();
       this.audioPlayer?.stop();
     } else if (this.status === STATUS.PAUSED) {
+      this.audioPlayer?.removeAllListeners();
       this.audioPlayer?.stop(true);
     }
 

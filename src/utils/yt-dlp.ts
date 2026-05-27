@@ -407,6 +407,58 @@ const extractFirstSearchResult = (raw: YtDlpRawSearchResult): YtDlpSearchResult 
   };
 };
 
+export interface SpotifyTrackStub {
+  readonly title: string;
+  readonly artist: string;
+  readonly thumbnailUrl: string | null;
+  readonly durationSeconds: number;
+}
+
+export interface SpotifyPlaylistStub {
+  readonly playlistTitle: string;
+  readonly tracks: SpotifyTrackStub[];
+}
+
+/**
+ * Extract a Spotify playlist's track list via yt-dlp's internal Spotify
+ * extractor (uses Spotify's web-player partner API, no OAuth required).
+ * Returns track metadata suitable for building ytsearch1: queries.
+ */
+export const getSpotifyPlaylistViaYtDlp = async (url: string): Promise<SpotifyPlaylistStub> => {
+  const {stdout} = await execa(getExecutable(), [
+    '--flat-playlist',
+    '--dump-single-json',
+    '--no-warnings',
+    '--no-cache-dir',
+    url,
+  ], {timeout: 120_000});
+
+  const raw = JSON.parse(stdout) as {
+    title?: string;
+    entries?: Array<{
+      title?: string;
+      uploader?: string;
+      artist?: string;
+      thumbnail?: string;
+      duration?: number;
+    }>;
+  };
+
+  const tracks: SpotifyTrackStub[] = (raw.entries ?? [])
+    .map(e => ({
+      title: e.title ?? '',
+      artist: e.uploader ?? e.artist ?? '',
+      thumbnailUrl: e.thumbnail ?? null,
+      durationSeconds: Math.round(e.duration ?? 0),
+    }))
+    .filter(t => t.title.length > 0);
+
+  return {
+    playlistTitle: raw.title ?? 'Spotify Playlist',
+    tracks,
+  };
+};
+
 export const searchWithYtDlp = async (query: string): Promise<YtDlpSearchResult | null> => {
   try {
     const {stdout} = await execa(getExecutable(), [

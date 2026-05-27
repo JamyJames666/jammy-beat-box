@@ -6,6 +6,7 @@ import {TYPES} from '../types.js';
 import ThirdParty from './third-party.js';
 import shuffle from 'array-shuffle';
 import {QueuedPlaylist} from './player.js';
+import {getSpotifyPlaylistViaYtDlp} from '../utils/yt-dlp.js';
 
 export interface SpotifyTrack {
   name: string;
@@ -35,59 +36,78 @@ export default class {
   async getPlaylist(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
 
-    // Use loose != null to catch both null and undefined track entries
-    // (the Spotify API can return undefined for unavailable/local tracks
-    // even though the TypeScript types only declare null)
+    // ── Attempt 1: Spotify Web API ──────────────────────────────────────────
+    // Use loose != null so both null and undefined track entries are filtered
+    // (Spotify can return undefined for local / region-locked tracks).
     const onlyTracks = (items: Array<SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject | null | undefined>) =>
       items.filter((t): t is SpotifyApi.TrackObjectFull => t != null && t.type === 'track');
 
-    // Fetch playlist metadata and first page of tracks in parallel.
-    // If getPlaylist itself throws (e.g. private playlist) we still want
-    // to surface the real error so fall through naturally.
-    let playlistTitle: string;
-    let playlistHref: string;
-    let tracksResponse: SpotifyApi.PagingObject<SpotifyApi.PlaylistTrackObject>;
-
     try {
-      const [{body: playlistResponse}, {body: firstPage}] = await Promise.all([
-        this.spotify.getPlaylist(uri.id),
-        this.spotify.getPlaylistTracks(uri.id, {limit: 50}),
-      ]);
-      playlistTitle = playlistResponse.name;
-      playlistHref = playlistResponse.href;
-      tracksResponse = firstPage;
-    } catch (error: unknown) {
-      // getPlaylist() might 403 for private playlists; fall back to tracks-only
-      const {body: firstPage} = await this.spotify.getPlaylistTracks(uri.id, {limit: 50});
-      tracksResponse = firstPage;
-      playlistTitle = 'Spotify Playlist';
-      playlistHref = `https://open.spotify.com/playlist/${uri.id}`;
-      void error; // suppress unused-var lint
-    }
+      let playlistTitle: string;
+      let playlistHref: string;
+      let tracksResponse: SpotifyApi.PagingObject<SpotifyApi.PlaylistTrackObject>;
 
-    const playlist = {title: playlistTitle, source: playlistHref};
-    const items = onlyTracks(tracksResponse.items.map(i => i.track));
+      try {
+        // Fetch metadata + first page in parallel
+        const [{body: playlistResponse}, {body: firstPage}] = await Promise.all([
+          this.spotify.getPlaylist(uri.id),
+          this.spotify.getPlaylistTracks(uri.id, {limit: 50}),
+        ]);
+        playlistTitle = playlistResponse.name;
+        playlistHref = playlistResponse.href;
+        tracksResponse = firstPage;
+      } catch {
+        // getPlaylist() might 403 (private / OAuth-required); retry tracks-only
+        const {body: firstPage} = await this.spotify.getPlaylistTracks(uri.id, {limit: 50});
+        tracksResponse = firstPage;
+        playlistTitle = 'Spotify Playlist';
+        playlistHref = `https://open.spotify.com/playlist/${uri.id}`;
+      }
 
-    while (tracksResponse.next) {
-      // eslint-disable-next-line no-await-in-loop
-      ({body: tracksResponse} = await this.spotify.getPlaylistTracks(uri.id, {
-        limit: parseInt(new URL(tracksResponse.next).searchParams.get('limit') ?? '50', 10),
-        offset: parseInt(new URL(tracksResponse.next).searchParams.get('offset') ?? '0', 10),
+      const playlist = {title: playlistTitle, source: playlistHref};
+      const items = onlyTracks(tracksResponse.items.map(i => i.track));
+
+      while (tracksResponse.next) {
+        // eslint-disable-next-line no-await-in-loop
+        ({body: tracksResponse} = await this.spotify.getPlaylistTracks(uri.id, {
+          limit: parseInt(new URL(tracksResponse.next).searchParams.get('limit') ?? '50', 10),
+          offset: parseInt(new URL(tracksResponse.next).searchParams.get('offset') ?? '0', 10),
+        }));
+
+        items.push(...onlyTracks(tracksResponse.items.map(i => i.track)));
+      }
+
+      if (items.length === 0) {
+        throw new Error('empty');
+      }
+
+      const tracks = this.limitTracks(items, playlistLimit).map(t => {
+        const thumbnail = t.album?.images?.[0]?.url ?? null;
+        return this.toSpotifyTrack(t, thumbnail);
+      });
+
+      return [tracks, playlist];
+    } catch {
+      // ── Attempt 2: yt-dlp Spotify extractor ────────────────────────────────
+      // Spotify Web API (Client Credentials) now 403s on many playlist types.
+      // yt-dlp's SpotifyPlaylistIE uses the partner web-player API instead —
+      // no OAuth required for public playlists.
+      const {playlistTitle, tracks: stubs} = await getSpotifyPlaylistViaYtDlp(url);
+
+      if (stubs.length === 0) {
+        throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
+      }
+
+      const tracks: SpotifyTrack[] = this.limitTracks(stubs, playlistLimit).map(s => ({
+        name: s.title,
+        artist: s.artist,
+        durationSeconds: s.durationSeconds,
+        thumbnailUrl: s.thumbnailUrl,
       }));
 
-      items.push(...onlyTracks(tracksResponse.items.map(i => i.track)));
+      const playlist = {title: playlistTitle, source: url};
+      return [tracks, playlist];
     }
-
-    if (items.length === 0) {
-      throw new Error('No playable tracks found in this Spotify playlist. It may be private, empty, or region-restricted.');
-    }
-
-    const tracks = this.limitTracks(items, playlistLimit).map(t => {
-      const thumbnail = t.album?.images?.[0]?.url ?? null;
-      return this.toSpotifyTrack(t, thumbnail);
-    });
-
-    return [tracks, playlist];
   }
 
   async getTrack(url: string): Promise<SpotifyTrack> {
