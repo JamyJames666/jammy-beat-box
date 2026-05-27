@@ -68,11 +68,18 @@ export async function login(password: string): Promise<string> {
   return token
 }
 
-export const getGuilds   = (t: string) => req<Guild[]>  ('GET', '/api/guilds', t)
-export const getChannels = (t: string, guildId: string) =>
+export const getGuilds      = (t: string) => req<Guild[]>('GET', '/api/guilds', t)
+export const getChannels    = (t: string, guildId: string) =>
   req<Channel[]>('GET', `/api/guilds/${guildId}/channels`, t)
-export const getStatus   = (t: string, guildId: string) =>
+export const getTextChannels = (t: string, guildId: string) =>
+  req<Channel[]>('GET', `/api/guilds/${guildId}/text-channels`, t)
+export const getStatus      = (t: string, guildId: string) =>
   req<PlayerStatus>('GET', `/api/guilds/${guildId}/status`, t)
+
+export const getAnnouncementChannel = (t: string, guildId: string) =>
+  req<{announcementChannelId: string | null}>('GET', `/api/guilds/${guildId}/settings/announcement`, t)
+export const setAnnouncementChannel = (t: string, guildId: string, channelId: string | null) =>
+  req<{ok: boolean}>('POST', `/api/guilds/${guildId}/settings/announcement`, t, {channelId})
 
 export const play    = (t: string, guildId: string, query: string, channelId?: string) =>
   req<{ ok: boolean; added: number; first: string }>(

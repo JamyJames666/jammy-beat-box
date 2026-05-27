@@ -8,6 +8,7 @@ import {
 import NowPlaying from './NowPlaying'
 import QueueCard from './QueueCard'
 import AddToQueue from './AddToQueue'
+import BotSettings from './BotSettings'
 
 interface Props {
   token: string
@@ -146,6 +147,11 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
           channelId={channelId}
           onChannelChange={handleChannelChange}
           onRefresh={poll}
+        />
+
+        <BotSettings
+          token={token}
+          guildId={guildId}
         />
       </main>
     </div>

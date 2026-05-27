@@ -10,6 +10,8 @@ import Config from './config.js';
 import PlayerManager from '../managers/player.js';
 import GetSongs from './get-songs.js';
 import {STATUS} from './player.js';
+import {getGuildSettings} from '../utils/get-guild-settings.js';
+import {prisma} from '../utils/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -61,31 +63,50 @@ const pickWebMessage = (count: number, first: string): string => {
 
 /**
  * Find the best text channel in a guild to announce web-dashboard activity.
- * Prefers the guild's system channel, then falls back to the first GuildText
- * channel the bot can both view and send messages in.
+ *
+ * Priority:
+ *   1. The channel stored in guild settings (user-chosen)
+ *   2. Any channel whose name is exactly "musicbot" (case-insensitive)
+ *   3. The guild's system channel
+ *   4. The first GuildText channel the bot can write to
  */
-const findAnnouncementChannel = (client: Client, guildId: string): TextChannel | null => {
+const findAnnouncementChannel = async (client: Client, guildId: string): Promise<TextChannel | null> => {
   const guild = client.guilds.cache.get(guildId);
   if (!guild) return null;
 
   const botId = client.user?.id;
-
   const canSend = (ch: TextChannel) => {
     if (!botId) return true;
     const perms = ch.permissionsFor(botId);
-    return perms?.has('SendMessages') && perms?.has('ViewChannel');
+    return Boolean(perms?.has('SendMessages') && perms?.has('ViewChannel'));
   };
 
-  // Prefer system channel
+  // 1. User-chosen channel stored in DB
+  const settings = await getGuildSettings(guildId);
+  if (settings.announcementChannelId) {
+    const stored = guild.channels.cache.get(settings.announcementChannelId);
+    if (stored?.type === ChannelType.GuildText && canSend(stored as TextChannel)) {
+      return stored as TextChannel;
+    }
+  }
+
+  // 2. Channel named "musicbot"
+  const musicBot = guild.channels.cache.find(
+    c => c.type === ChannelType.GuildText
+      && c.name.toLowerCase() === 'musicbot'
+      && canSend(c as TextChannel),
+  );
+  if (musicBot) return musicBot as TextChannel;
+
+  // 3. Guild system channel
   if (guild.systemChannel && canSend(guild.systemChannel)) {
     return guild.systemChannel;
   }
 
-  // Fall back to first writable text channel
+  // 4. First writable text channel
   const fallback = guild.channels.cache
     .filter(c => c.type === ChannelType.GuildText)
     .find(c => canSend(c as TextChannel));
-
   return (fallback as TextChannel | undefined) ?? null;
 };
 
@@ -178,6 +199,48 @@ export default class WebServer {
       res.json(Array.from(channels.values()));
     });
 
+    // List all text channels the bot can write to (for announcement channel picker)
+    this.app.get('/api/guilds/:guildId/text-channels', auth, (req: express.Request, res: express.Response) => {
+      const guild = this.client.guilds.cache.get(req.params.guildId);
+      if (!guild) {
+        res.status(404).json({error: 'Guild not found'});
+        return;
+      }
+
+      const botId = this.client.user?.id;
+      const channels = guild.channels.cache
+        .filter(c => {
+          if (c.type !== ChannelType.GuildText) return false;
+          if (!botId) return true;
+          const perms = (c as TextChannel).permissionsFor(botId);
+          return Boolean(perms?.has('SendMessages') && perms?.has('ViewChannel'));
+        })
+        .map(c => ({id: c.id, name: c.name}));
+      res.json(Array.from(channels.values()));
+    });
+
+    // Get / set the announcement channel for this guild
+    this.app.get('/api/guilds/:guildId/settings/announcement', auth, async (req: express.Request, res: express.Response) => {
+      const settings = await getGuildSettings(req.params.guildId);
+      res.json({announcementChannelId: settings.announcementChannelId ?? null});
+    });
+
+    this.app.post('/api/guilds/:guildId/settings/announcement', auth, async (req: express.Request, res: express.Response) => {
+      const {channelId} = req.body as {channelId?: string | null};
+
+      // channelId = null means "reset to auto-detect"
+      try {
+        await prisma.setting.upsert({
+          where: {guildId: req.params.guildId},
+          create: {guildId: req.params.guildId, announcementChannelId: channelId ?? null},
+          update: {announcementChannelId: channelId ?? null},
+        });
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
     this.app.post('/api/guilds/:guildId/play', auth, async (req: express.Request, res: express.Response) => {
       const {query, channelId} = req.body as {query?: string; channelId?: string};
       if (!query) {
@@ -219,7 +282,7 @@ export default class WebServer {
         }
 
         // Announce to Discord that the web dashboard added songs
-        const announceCh = findAnnouncementChannel(this.client, req.params.guildId);
+        const announceCh = await findAnnouncementChannel(this.client, req.params.guildId);
         if (announceCh) {
           const msg = pickWebMessage(songs.length, songs[0].title);
           announceCh.send(msg).catch(() => { /* best-effort */ });

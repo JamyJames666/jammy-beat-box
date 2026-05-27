@@ -34,6 +34,7 @@ model Setting {
   defaultQueuePageSize                Int      @default(10)
   turnDownVolumeWhenPeopleSpeak       Boolean  @default(false)
   turnDownVolumeWhenPeopleSpeakTarget Int      @default(20)
+  announcementChannelId               String?
   createdAt                           DateTime @default(now())
   updatedAt                           DateTime @updatedAt
 }
