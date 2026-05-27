@@ -26,7 +26,7 @@ model KeyValueCache {
 model Setting {
   guildId                             String   @id
   playlistLimit                       Int      @default(50)
-  secondsToWaitAfterQueueEmpties      Int      @default(30)
+  secondsToWaitAfterQueueEmpties      Int      @default(600)
   leaveIfNoListeners                  Boolean  @default(true)
   queueAddResponseEphemeral           Boolean  @default(false)
   autoAnnounceNextSong                Boolean  @default(false)

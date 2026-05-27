@@ -82,10 +82,11 @@ export const pause   = (t: string, guildId: string) => req('POST', `/api/guilds/
 export const resume  = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/resume`, t)
 export const skip    = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/skip`,   t)
 export const stop    = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/stop`,   t)
-export const shuffle = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/queue/shuffle`, t)
-export const move    = (t: string, guildId: string, from: number, to: number) =>
+export const shuffle    = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/queue/shuffle`, t)
+export const clearQueue = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/queue/clear`,   t)
+export const move       = (t: string, guildId: string, from: number, to: number) =>
   req('POST', `/api/guilds/${guildId}/queue/move`,   t, { from, to })
-export const remove  = (t: string, guildId: string, index: number) =>
+export const remove     = (t: string, guildId: string, index: number) =>
   req('POST', `/api/guilds/${guildId}/queue/remove`, t, { index })
 export const setVolume = (t: string, guildId: string, level: number) =>
   req('POST', `/api/guilds/${guildId}/volume`, t, { level })

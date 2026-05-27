@@ -488,6 +488,37 @@ export default class {
     this.queue = [];
   }
 
+  /**
+   * Clears the entire queue and stops playback, but keeps the bot connected
+   * to the voice channel. The bot will disconnect after the configured idle
+   * timeout (secondsToWaitAfterQueueEmpties).
+   */
+  async clearQueue(): Promise<void> {
+    this.audioPlayer?.stop(true);
+    this.status = STATUS.IDLE;
+    this.nowPlaying = null;
+    this.positionInSeconds = 0;
+    this.queuePosition = 0;
+    this.queue = [];
+    this.stopTrackingPosition();
+
+    // Reset any pending idle disconnect timer and start a fresh one
+    if (this.disconnectTimer) {
+      clearTimeout(this.disconnectTimer);
+      this.disconnectTimer = null;
+    }
+
+    const settings = await getGuildSettings(this.guildId);
+    const {secondsToWaitAfterQueueEmpties} = settings;
+    if (secondsToWaitAfterQueueEmpties !== 0) {
+      this.disconnectTimer = setTimeout(() => {
+        if (this.status === STATUS.IDLE) {
+          this.disconnect();
+        }
+      }, secondsToWaitAfterQueueEmpties * 1000);
+    }
+  }
+
   scheduleEmptyChannelDisconnect(seconds: number): void {
     if (this.emptyChannelTimer) return;
     this.emptyChannelTimer = setTimeout(() => {

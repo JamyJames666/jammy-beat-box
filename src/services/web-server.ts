@@ -304,6 +304,16 @@ export default class WebServer {
       }
     });
 
+    // Clear the entire queue + stop playback but keep the bot connected.
+    this.app.post('/api/guilds/:guildId/queue/clear', auth, async (req: express.Request, res: express.Response) => {
+      try {
+        await this.playerManager.get(req.params.guildId).clearQueue();
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
     this.app.post('/api/guilds/:guildId/queue/move', auth, (req: express.Request, res: express.Response) => {
       const {from, to} = req.body as {from?: number; to?: number};
       if (typeof from !== 'number' || typeof to !== 'number') {

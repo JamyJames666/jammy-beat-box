@@ -16,8 +16,8 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Shuffle, GripVertical, X, Music } from 'lucide-react'
-import { shuffle, move, remove, type TrackInfo } from '@/lib/api'
+import { Shuffle, GripVertical, X, Music, Trash2 } from 'lucide-react'
+import { shuffle, clearQueue, move, remove, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
@@ -163,6 +163,11 @@ export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
     onRefresh()
   }
 
+  const handleClearQueue = async () => {
+    await clearQueue(token, guildId).catch(() => null)
+    onRefresh()
+  }
+
   const handleRemove = async (index: number) => {
     // Optimistic remove
     setOptimisticQueue(displayQueue.filter((_, i) => i !== index))
@@ -193,6 +198,15 @@ export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
           disabled={displayQueue.length < 2}
         >
           <Shuffle size={13} /> Shuffle
+        </button>
+        <button
+          className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5
+                     text-app-danger hover:text-app-danger hover:bg-app-danger/10"
+          onClick={handleClearQueue}
+          disabled={displayQueue.length === 0}
+          title="Clear queue — bot stays connected"
+        >
+          <Trash2 size={13} /> Clear
         </button>
       </div>
 
