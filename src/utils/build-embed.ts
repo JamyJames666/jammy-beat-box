@@ -49,6 +49,14 @@ const getPlayerUI = (player: Player) => {
   return `${button} ${progressBar} \`[${elapsedTime}]\`🔉 ${vol} ${loop}`;
 };
 
+const formatRequestedBy = (requestedBy: string): string => {
+  if (requestedBy === 'web-dashboard') {
+    return '🌐 Web Dashboard';
+  }
+
+  return `<@${requestedBy}>`;
+};
+
 export const buildPlayingMessageEmbed = (player: Player): EmbedBuilder => {
   const currentlyPlaying = player.getCurrent();
 
@@ -63,7 +71,7 @@ export const buildPlayingMessageEmbed = (player: Player): EmbedBuilder => {
     .setTitle(player.status === STATUS.PLAYING ? 'Now Playing' : 'Paused')
     .setDescription(`
       **${getSongTitle(currentlyPlaying)}**
-      Requested by: <@${requestedBy}>\n
+      Requested by: ${formatRequestedBy(requestedBy)}\n
       ${getPlayerUI(player)}
     `)
     .setFooter({text: `Source: ${artist}`});
@@ -109,7 +117,7 @@ export const buildQueueEmbed = (player: Player, page: number, pageSize: number):
   const message = new EmbedBuilder();
 
   let description = `**${getSongTitle(currentlyPlaying)}**\n`;
-  description += `Requested by: <@${requestedBy}>\n\n`;
+  description += `Requested by: ${formatRequestedBy(requestedBy)}\n\n`;
   description += `${getPlayerUI(player)}\n\n`;
 
   if (player.getQueue().length > 0) {

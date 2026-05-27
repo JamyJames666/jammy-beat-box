@@ -35,13 +35,38 @@ export default class {
   async getPlaylist(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
 
-    let [{body: playlistResponse}, {body: tracksResponse}] = await Promise.all([this.spotify.getPlaylist(uri.id), this.spotify.getPlaylistTracks(uri.id, {limit: 50})]);
+    // Use loose != null to catch both null and undefined track entries
+    // (the Spotify API can return undefined for unavailable/local tracks
+    // even though the TypeScript types only declare null)
+    const onlyTracks = (items: Array<SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject | null | undefined>) =>
+      items.filter((t): t is SpotifyApi.TrackObjectFull => t != null && t.type === 'track');
 
-    const onlyTracks = (items: Array<SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject | null>) =>
-      items.filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t.type === 'track');
+    // Fetch playlist metadata and first page of tracks in parallel.
+    // If getPlaylist itself throws (e.g. private playlist) we still want
+    // to surface the real error so fall through naturally.
+    let playlistTitle: string;
+    let playlistHref: string;
+    let tracksResponse: SpotifyApi.PagingObject<SpotifyApi.PlaylistTrackObject>;
 
+    try {
+      const [{body: playlistResponse}, {body: firstPage}] = await Promise.all([
+        this.spotify.getPlaylist(uri.id),
+        this.spotify.getPlaylistTracks(uri.id, {limit: 50}),
+      ]);
+      playlistTitle = playlistResponse.name;
+      playlistHref = playlistResponse.href;
+      tracksResponse = firstPage;
+    } catch (error: unknown) {
+      // getPlaylist() might 403 for private playlists; fall back to tracks-only
+      const {body: firstPage} = await this.spotify.getPlaylistTracks(uri.id, {limit: 50});
+      tracksResponse = firstPage;
+      playlistTitle = 'Spotify Playlist';
+      playlistHref = `https://open.spotify.com/playlist/${uri.id}`;
+      void error; // suppress unused-var lint
+    }
+
+    const playlist = {title: playlistTitle, source: playlistHref};
     const items = onlyTracks(tracksResponse.items.map(i => i.track));
-    const playlist = {title: playlistResponse.name, source: playlistResponse.href};
 
     while (tracksResponse.next) {
       // eslint-disable-next-line no-await-in-loop
@@ -51,6 +76,10 @@ export default class {
       }));
 
       items.push(...onlyTracks(tracksResponse.items.map(i => i.track)));
+    }
+
+    if (items.length === 0) {
+      throw new Error('No playable tracks found in this Spotify playlist. It may be private, empty, or region-restricted.');
     }
 
     const tracks = this.limitTracks(items, playlistLimit).map(t => {

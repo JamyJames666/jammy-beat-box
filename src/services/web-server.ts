@@ -4,12 +4,12 @@ import express from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import {fileURLToPath} from 'url';
-import {Client, VoiceChannel, ChannelType} from 'discord.js';
+import {Client, VoiceChannel, ChannelType, TextChannel} from 'discord.js';
 import {TYPES} from '../types.js';
 import Config from './config.js';
 import PlayerManager from '../managers/player.js';
 import GetSongs from './get-songs.js';
-import {STATUS, MediaSource} from './player.js';
+import {STATUS} from './player.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,6 +27,66 @@ const songSourceLabel = (song: {thumbnailUrl: string | null; playlist: {source: 
   }
 
   return 'youtube';
+};
+
+const WEB_ADDED_MESSAGES_SINGLE = [
+  '🖥️ someone snuck in from the web dashboard and queued up **{song}**',
+  '🌐 remote control activated — **{song}** just dropped into the queue',
+  '📲 the web overlords have spoken: **{song}** has been summoned',
+  '👀 **{song}** materialised from thin air (the web dashboard did it)',
+  '🕹️ a mysterious dashboard user added **{song}** to the queue',
+  '🌍 beaming in from the internet: **{song}** is now in the queue',
+  '🤖 the web dashboard just YOLO\'d **{song}** into the queue',
+  '🎯 someone aimed their browser at the queue and fired: **{song}**',
+];
+
+const WEB_ADDED_MESSAGES_PLAYLIST = [
+  '🖥️ the web dashboard just carpet-bombed the queue with **{count} songs** starting with **{first}**',
+  '🌐 {count} songs incoming from the web dashboard — leading off with **{first}**',
+  '📲 whoever\'s on the dashboard just queued **{count} songs** ({first} + more)',
+  '🎵 web dashboard move: **{count} songs** added, starting with **{first}**',
+  '🌊 a wave of **{count} songs** washed in from the web dashboard — **{first}** up first',
+  '👾 web dashboard user: *adds {count} songs at once* — first up: **{first}**',
+];
+
+const pickWebMessage = (count: number, first: string): string => {
+  if (count === 1) {
+    const template = WEB_ADDED_MESSAGES_SINGLE[Math.floor(Math.random() * WEB_ADDED_MESSAGES_SINGLE.length)];
+    return template.replace('{song}', first);
+  }
+
+  const template = WEB_ADDED_MESSAGES_PLAYLIST[Math.floor(Math.random() * WEB_ADDED_MESSAGES_PLAYLIST.length)];
+  return template.replace('{count}', String(count)).replace('{first}', first);
+};
+
+/**
+ * Find the best text channel in a guild to announce web-dashboard activity.
+ * Prefers the guild's system channel, then falls back to the first GuildText
+ * channel the bot can both view and send messages in.
+ */
+const findAnnouncementChannel = (client: Client, guildId: string): TextChannel | null => {
+  const guild = client.guilds.cache.get(guildId);
+  if (!guild) return null;
+
+  const botId = client.user?.id;
+
+  const canSend = (ch: TextChannel) => {
+    if (!botId) return true;
+    const perms = ch.permissionsFor(botId);
+    return perms?.has('SendMessages') && perms?.has('ViewChannel');
+  };
+
+  // Prefer system channel
+  if (guild.systemChannel && canSend(guild.systemChannel)) {
+    return guild.systemChannel;
+  }
+
+  // Fall back to first writable text channel
+  const fallback = guild.channels.cache
+    .filter(c => c.type === ChannelType.GuildText)
+    .find(c => canSend(c as TextChannel));
+
+  return (fallback as TextChannel | undefined) ?? null;
 };
 
 @injectable()
@@ -156,6 +216,13 @@ export default class WebServer {
           await player.play();
         } else if (player.status === STATUS.IDLE) {
           await player.play();
+        }
+
+        // Announce to Discord that the web dashboard added songs
+        const announceCh = findAnnouncementChannel(this.client, req.params.guildId);
+        if (announceCh) {
+          const msg = pickWebMessage(songs.length, songs[0].title);
+          announceCh.send(msg).catch(() => { /* best-effort */ });
         }
 
         res.json({ok: true, added: songs.length, first: songs[0].title});
