@@ -93,13 +93,13 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
     <div className="min-h-screen bg-app-bg">
       {/* ── Header ── */}
       <header className="sticky top-0 z-30 bg-app-surface/80 backdrop-blur-md
-                         border-b border-app-border px-4 sm:px-6 py-3">
-        <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <div className="flex items-center gap-2 mr-auto">
-            <div className="w-7 h-7 rounded-lg bg-app-accent/20 flex items-center justify-center">
-              <Music2 size={14} className="text-app-accent" />
+                         border-b border-app-border px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center gap-4">
+          <div className="flex items-center gap-2.5 mr-auto">
+            <div className="w-8 h-8 rounded-xl bg-app-accent/20 flex items-center justify-center">
+              <Music2 size={16} className="text-app-accent" />
             </div>
-            <span className="font-semibold text-app-text text-sm tracking-tight">Muse</span>
+            <span className="font-bold text-app-text text-base tracking-tight">Muse</span>
           </div>
 
           {/* Guild selector */}
@@ -108,8 +108,8 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
               <select
                 value={guildId}
                 onChange={e => handleGuildChange(e.target.value)}
-                className="appearance-none bg-app-panel border border-app-border rounded-lg
-                           text-app-text text-sm pl-3 pr-8 py-1.5 cursor-pointer
+                className="appearance-none bg-app-panel border border-app-border rounded-xl
+                           text-app-text text-sm pl-4 pr-9 py-2 cursor-pointer
                            focus:outline-none focus:border-app-accent hover:border-app-muted/50
                            transition-colors"
               >
@@ -117,7 +117,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
-              <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2
+              <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2
                                                  text-app-muted pointer-events-none" />
             </div>
           )}
@@ -125,34 +125,40 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       </header>
 
       {/* ── Main content ── */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-        <NowPlaying
-          status={status}
-          token={token}
-          guildId={guildId}
-          onRefresh={poll}
-        />
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
 
-        <QueueCard
-          queue={status?.queue ?? []}
-          token={token}
-          guildId={guildId}
-          onRefresh={poll}
-        />
+          {/* Left column */}
+          <div className="flex flex-col gap-6">
+            <NowPlaying
+              status={status}
+              token={token}
+              guildId={guildId}
+              onRefresh={poll}
+            />
+            <AddToQueue
+              token={token}
+              guildId={guildId}
+              channels={channels}
+              channelId={channelId}
+              onChannelChange={handleChannelChange}
+              onRefresh={poll}
+            />
+            <BotSettings
+              token={token}
+              guildId={guildId}
+            />
+          </div>
 
-        <AddToQueue
-          token={token}
-          guildId={guildId}
-          channels={channels}
-          channelId={channelId}
-          onChannelChange={handleChannelChange}
-          onRefresh={poll}
-        />
+          {/* Right column — queue */}
+          <QueueCard
+            queue={status?.queue ?? []}
+            token={token}
+            guildId={guildId}
+            onRefresh={poll}
+          />
 
-        <BotSettings
-          token={token}
-          guildId={guildId}
-        />
+        </div>
       </main>
     </div>
   )

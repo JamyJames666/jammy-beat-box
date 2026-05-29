@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Shuffle, GripVertical, X, Music, Trash2 } from 'lucide-react'
+import { Shuffle, GripVertical, X, Music, Trash2, ListMusic } from 'lucide-react'
 import { shuffle, clearQueue, move, remove, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
@@ -50,9 +50,9 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        'flex items-center gap-3 rounded-xl px-3 py-2.5',
+        'flex items-center gap-3 rounded-xl px-3 py-3',
         'bg-app-panel border border-transparent',
-        'hover:border-app-border hover:bg-app-panel/80 transition-all',
+        'hover:border-app-border hover:bg-[#1e1e2e] transition-all duration-150',
         isDragging && 'opacity-40 shadow-glow z-10',
       )}
     >
@@ -64,7 +64,7 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
         {...listeners}
         aria-label="Drag to reorder"
       >
-        <GripVertical size={14} />
+        <GripVertical size={15} />
       </button>
 
       {/* Thumbnail */}
@@ -73,7 +73,7 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
           src={item.thumbnailUrl}
           alt=""
           loading="lazy"
-          className="w-9 h-9 rounded-lg object-cover flex-shrink-0 bg-app-border"
+          className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-app-border"
           onError={e => {
             const img = e.target as HTMLImageElement
             img.style.display = 'none'
@@ -82,26 +82,26 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
         />
       ) : null}
       <div
-        className="w-9 h-9 rounded-lg bg-app-border flex items-center justify-center
+        className="w-12 h-12 rounded-lg bg-app-border/60 flex items-center justify-center
                    flex-shrink-0 text-app-muted"
         style={item.thumbnailUrl ? { display: 'none' } : {}}
       >
-        <Music size={12} />
+        <Music size={16} />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-app-text truncate leading-snug" title={item.title}>
+        <p className="text-sm font-medium text-app-text truncate leading-snug" title={item.title}>
           {item.title}
         </p>
-        <div className="flex items-center gap-1.5 mt-0.5">
+        <div className="flex items-center gap-2 mt-1">
           <p className="text-xs text-app-muted truncate">{item.artist}</p>
           {item.source && <SourceBadge source={item.source} />}
         </div>
       </div>
 
       {/* Duration */}
-      <span className="text-xs text-app-muted flex-shrink-0 tabular-nums">
+      <span className="text-xs text-app-muted flex-shrink-0 tabular-nums font-mono">
         {fmtTime(item.length)}
       </span>
 
@@ -111,7 +111,7 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
         onClick={() => onRemove(index)}
         aria-label="Remove from queue"
       >
-        <X size={13} />
+        <X size={14} />
       </button>
     </li>
   )
@@ -180,27 +180,28 @@ export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
   }
 
   return (
-    <div className="card p-5 space-y-4">
+    <div className="card p-6 flex flex-col gap-5 min-h-[300px]">
       {/* Header */}
       <div className="flex items-center gap-3">
+        <ListMusic size={15} className="text-app-muted flex-shrink-0" />
         <h2 className="text-xs font-semibold text-app-muted uppercase tracking-widest mr-auto">
           Queue
         </h2>
         {displayQueue.length > 0 && (
-          <span className="text-xs text-app-muted bg-app-panel px-2 py-0.5 rounded-full
-                           border border-app-border">
+          <span className="text-xs text-app-muted bg-app-panel px-2.5 py-1 rounded-full
+                           border border-app-border tabular-nums">
             {displayQueue.length} {displayQueue.length === 1 ? 'song' : 'songs'}
           </span>
         )}
         <button
-          className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"
+          className="btn-ghost flex items-center gap-1.5 text-xs px-3 py-1.5"
           onClick={handleShuffle}
           disabled={displayQueue.length < 2}
         >
           <Shuffle size={13} /> Shuffle
         </button>
         <button
-          className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5
+          className="btn-ghost flex items-center gap-1.5 text-xs px-3 py-1.5
                      text-app-danger hover:text-app-danger hover:bg-app-danger/10"
           onClick={handleClearQueue}
           disabled={displayQueue.length === 0}
@@ -211,7 +212,13 @@ export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
       </div>
 
       {displayQueue.length === 0 ? (
-        <p className="text-sm text-app-muted py-2">Queue is empty.</p>
+        <div className="flex flex-col items-center justify-center flex-1 py-12 gap-3">
+          <div className="w-14 h-14 rounded-2xl bg-app-panel flex items-center justify-center">
+            <Music size={22} className="text-app-muted" />
+          </div>
+          <p className="text-sm text-app-muted">Queue is empty</p>
+          <p className="text-xs text-app-border">Add songs to get started</p>
+        </div>
       ) : (
         <DndContext
           sensors={sensors}
@@ -222,7 +229,8 @@ export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
             items={displayQueue.map((_, i) => String(i))}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="space-y-1 max-h-[480px] overflow-y-auto -mx-1 px-1 py-0.5">
+            <ul className="space-y-1.5 overflow-y-auto -mx-1 px-1 py-0.5"
+                style={{ maxHeight: 'calc(100vh - 280px)', minHeight: '200px' }}>
               {displayQueue.map((item, i) => (
                 <QueueRow
                   key={`${item.url}-${i}`}
