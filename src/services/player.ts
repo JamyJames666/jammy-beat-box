@@ -520,7 +520,10 @@ export default class {
   }
 
   scheduleEmptyChannelDisconnect(seconds: number): void {
-    if (this.emptyChannelTimer) return;
+    if (this.emptyChannelTimer) {
+      return;
+    }
+
     this.emptyChannelTimer = setTimeout(() => {
       this.emptyChannelTimer = null;
       if (this.voiceConnection) {

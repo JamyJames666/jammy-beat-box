@@ -226,6 +226,10 @@ export default class WebServer {
             return false;
           }
 
+          if (!c.name.toLowerCase().includes('music')) {
+            return false;
+          }
+
           if (!botId) {
             return true;
           }
