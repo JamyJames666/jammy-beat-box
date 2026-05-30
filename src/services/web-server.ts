@@ -15,7 +15,9 @@ import {prisma} from '../utils/db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+// Keeping tokens short-lived reduces the blast radius if localStorage is
+// accessed by injected JS. Full httpOnly-cookie migration is a future task.
+const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
 
 /**
  * Detect whether a queued song originated from Spotify or YouTube.
@@ -286,6 +288,15 @@ export default class WebServer {
         const player = this.playerManager.get(req.params.guildId);
         const fallbackChannelId = guild.channels.cache.find(c => c.type === ChannelType.GuildVoice)?.id ?? '';
         const targetChannelId = channelId ?? fallbackChannelId;
+
+        // Validate the target channel before polluting the queue.
+        if (targetChannelId) {
+          const targetChannel = guild.channels.cache.get(targetChannelId);
+          if (!targetChannel || targetChannel.type !== ChannelType.GuildVoice) {
+            res.status(400).json({error: 'Invalid or non-voice channel'});
+            return;
+          }
+        }
 
         songs.forEach(song => {
           player.add({

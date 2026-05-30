@@ -18,6 +18,14 @@ export default {
           spotify: '#1db954',
           youtube: '#ff0000',
         },
+        // DJ Deck v3 tokens
+        'deck-a':      '#3b82f6',
+        'deck-b':      '#f97316',
+        lcd:           '#86efac',
+        'lcd-bg':      '#060e06',
+        'meter-green': '#22c55e',
+        'meter-yellow':'#eab308',
+        'meter-red':   '#ef4444',
       },
       borderRadius: {
         '4': '4px',

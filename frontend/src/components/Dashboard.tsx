@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Music2, ChevronDown, Sliders } from 'lucide-react'
+import { Music2, ChevronDown, Sliders, Zap } from 'lucide-react'
 import {
   getGuilds, getChannels, getStatus,
   ApiError,
@@ -10,6 +10,7 @@ import QueueCard from './QueueCard'
 import AddToQueue from './AddToQueue'
 import BotSettings from './BotSettings'
 import DjDeck from './DjDeck'
+import DjDeckV3 from './DjDeckV3'
 
 interface Props {
   token: string
@@ -23,7 +24,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [guildId,   setGuildId]   = useState<string>(() => localStorage.getItem('muse_guild') ?? '')
   const [channelId, setChannelId] = useState<string>('')
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
-  const [view,      setView]      = useState<'player' | 'deck'>('player')
+  const [view,      setView]      = useState<'player' | 'deck' | 'pro'>('player')
 
   // ── Load guilds on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -122,6 +123,15 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
             >
               <Sliders size={12} /> DJ Deck
             </button>
+            <button
+              onClick={() => setView('pro')}
+              className={view === 'pro'
+                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm'
+                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
+              style={view === 'pro' ? { background: '#f97316' } : {}}
+            >
+              <Zap size={12} /> PRO
+            </button>
           </div>
 
           {/* Guild selector */}
@@ -147,7 +157,9 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       </header>
 
       {/* ── Main content ── */}
-      {view === 'deck' ? (
+      {view === 'pro' ? (
+        <DjDeckV3 status={status} token={token} guildId={guildId} onRefresh={poll} />
+      ) : view === 'deck' ? (
         <DjDeck status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
         <main className="max-w-7xl mx-auto px-6 py-8">

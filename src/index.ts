@@ -23,12 +23,10 @@ const startBot = async () => {
 
   container.get<WebServer>(TYPES.WebServer).start();
 
-  try {
-    await bot.register();
-  } catch (error: unknown) {
-    console.error('Discord connection failed:', (error as Error).message);
-    console.error('Web dashboard remains available. Bot will not retry until restart.');
-  }
+  // If Discord registration fails, exit so the supervisor (Docker/systemd)
+  // restarts the process. A silent catch would leave a zombie that looks
+  // alive but has no bot functionality.
+  await bot.register();
 };
 
 export {startBot};
