@@ -1,7 +1,7 @@
--- Fix column-level DEFAULT for secondsToWaitAfterQueueEmpties.
--- The schema says @default(600) but all prior table rebuilds used DEFAULT 30,
--- so new Setting rows created by raw DB inserts would get 30 seconds.
--- SQLite cannot ALTER COLUMN DEFAULT, so we rebuild the table.
+-- Fix column-level DEFAULT for secondsToWaitAfterQueueEmpties from 30 to 600.
+-- SQLite cannot ALTER COLUMN DEFAULT, so the table must be rebuilt.
+-- Explicit column list in INSERT avoids positional mismatch from prior
+-- ALTER TABLE ADD COLUMN migrations which append columns at the end.
 PRAGMA foreign_keys=OFF;
 CREATE TABLE "new_Setting" (
     "guildId" TEXT NOT NULL PRIMARY KEY,
@@ -13,7 +13,16 @@ CREATE TABLE "new_Setting" (
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
-INSERT INTO "new_Setting" SELECT * FROM "Setting";
+INSERT INTO "new_Setting" (
+    "guildId", "playlistLimit", "secondsToWaitAfterQueueEmpties",
+    "leaveIfNoListeners", "autoAnnounceNextSong", "announcementChannelId",
+    "createdAt", "updatedAt"
+)
+SELECT
+    "guildId", "playlistLimit", "secondsToWaitAfterQueueEmpties",
+    "leaveIfNoListeners", "autoAnnounceNextSong", "announcementChannelId",
+    "createdAt", "updatedAt"
+FROM "Setting";
 DROP TABLE "Setting";
 ALTER TABLE "new_Setting" RENAME TO "Setting";
 PRAGMA foreign_key_check;

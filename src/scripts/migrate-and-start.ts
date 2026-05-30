@@ -67,6 +67,23 @@ const hasDatabaseBeenMigratedToPrisma = async () => {
     }
   }
 
+  // If a previous migration run crashed mid-flight, Prisma will refuse to
+  // deploy until the failed record is resolved. Auto-resolve any failed
+  // migrations as rolled-back so deploy can retry them cleanly.
+  const prismaClient = new Prisma.PrismaClient();
+  try {
+    const failed = await prismaClient.$queryRaw<Array<{migration_name: string}>>`
+      SELECT migration_name FROM _prisma_migrations
+      WHERE finished_at IS NULL AND applied_steps_count > 0
+    `;
+    await prismaClient.$disconnect();
+    await Promise.all(failed.map(async m =>
+      execa('prisma', ['migrate', 'resolve', '--rolled-back', m.migration_name], {preferLocal: true}),
+    ));
+  } catch {
+    await prismaClient.$disconnect();
+  }
+
   try {
     await execa('prisma', ['migrate', 'deploy'], {preferLocal: true});
   } catch (error: unknown) {
