@@ -90,6 +90,7 @@ export default class {
   private defaultVolume: number = DEFAULT_VOLUME;
   private speed = 1;
   private effect: AudioEffect = 'none';
+  private eq = {bass: 0, mid: 0, treble: 0};
   private consecutivePlayErrors = 0;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
@@ -603,6 +604,18 @@ export default class {
     return this.effect;
   }
 
+  setEq(bass: number, mid: number, treble: number): void {
+    this.eq = {
+      bass: Math.max(-12, Math.min(12, bass)),
+      mid: Math.max(-12, Math.min(12, mid)),
+      treble: Math.max(-12, Math.min(12, treble)),
+    };
+  }
+
+  getEq(): {bass: number; mid: number; treble: number} {
+    return {...this.eq};
+  }
+
   // Resolve YouTube thumbnails for all queued Spotify tracks in the background.
   // Uses @distube/ytsr (fast, ~200-500ms per search) with concurrency 8 so a
   // 96-song playlist resolves in ~10-15 seconds.
@@ -880,6 +893,18 @@ export default class {
       }
 
       activeFilters.push(...AUDIO_EFFECT_FILTERS[this.effect]);
+
+      if (this.eq.bass !== 0) {
+        activeFilters.push(`equalizer=f=80:t=q:w=1.0:g=${this.eq.bass}`);
+      }
+
+      if (this.eq.mid !== 0) {
+        activeFilters.push(`equalizer=f=1000:t=q:w=1.0:g=${this.eq.mid}`);
+      }
+
+      if (this.eq.treble !== 0) {
+        activeFilters.push(`equalizer=f=8000:t=q:w=1.0:g=${this.eq.treble}`);
+      }
 
       if (activeFilters.length > 0) {
         ffmpegCmd.audioFilters(activeFilters);

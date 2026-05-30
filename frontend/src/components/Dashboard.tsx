@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Music2, ChevronDown } from 'lucide-react'
+import { Music2, ChevronDown, Sliders } from 'lucide-react'
 import {
   getGuilds, getChannels, getStatus,
   ApiError,
@@ -9,6 +9,7 @@ import NowPlaying from './NowPlaying'
 import QueueCard from './QueueCard'
 import AddToQueue from './AddToQueue'
 import BotSettings from './BotSettings'
+import DjDeck from './DjDeck'
 
 interface Props {
   token: string
@@ -22,6 +23,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [guildId,   setGuildId]   = useState<string>(() => localStorage.getItem('muse_guild') ?? '')
   const [channelId, setChannelId] = useState<string>('')
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
+  const [view,      setView]      = useState<'player' | 'deck'>('player')
 
   // ── Load guilds on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -102,6 +104,26 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
             <span className="font-bold text-app-text text-base tracking-tight">Muse</span>
           </div>
 
+          {/* View tabs */}
+          <div className="flex items-center gap-1 bg-app-panel rounded-xl p-1 border border-app-border">
+            <button
+              onClick={() => setView('player')}
+              className={view === 'player'
+                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-app-surface text-app-text text-xs font-medium shadow-sm'
+                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
+            >
+              <Music2 size={12} /> Player
+            </button>
+            <button
+              onClick={() => setView('deck')}
+              className={view === 'deck'
+                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-app-accent text-white text-xs font-medium shadow-sm'
+                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
+            >
+              <Sliders size={12} /> DJ Deck
+            </button>
+          </div>
+
           {/* Guild selector */}
           {guilds.length > 0 && (
             <div className="relative">
@@ -125,41 +147,45 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       </header>
 
       {/* ── Main content ── */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
+      {view === 'deck' ? (
+        <DjDeck status={status} token={token} guildId={guildId} onRefresh={poll} />
+      ) : (
+        <main className="max-w-7xl mx-auto px-6 py-8">
+          <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
 
-          {/* Left column */}
-          <div className="flex flex-col gap-6">
-            <NowPlaying
-              status={status}
+            {/* Left column */}
+            <div className="flex flex-col gap-6">
+              <NowPlaying
+                status={status}
+                token={token}
+                guildId={guildId}
+                onRefresh={poll}
+              />
+              <AddToQueue
+                token={token}
+                guildId={guildId}
+                channels={channels}
+                channelId={channelId}
+                onChannelChange={handleChannelChange}
+                onRefresh={poll}
+              />
+              <BotSettings
+                token={token}
+                guildId={guildId}
+              />
+            </div>
+
+            {/* Right column — queue */}
+            <QueueCard
+              queue={status?.queue ?? []}
               token={token}
               guildId={guildId}
               onRefresh={poll}
             />
-            <AddToQueue
-              token={token}
-              guildId={guildId}
-              channels={channels}
-              channelId={channelId}
-              onChannelChange={handleChannelChange}
-              onRefresh={poll}
-            />
-            <BotSettings
-              token={token}
-              guildId={guildId}
-            />
+
           </div>
-
-          {/* Right column — queue */}
-          <QueueCard
-            queue={status?.queue ?? []}
-            token={token}
-            guildId={guildId}
-            onRefresh={poll}
-          />
-
-        </div>
-      </main>
+        </main>
+      )}
     </div>
   )
 }

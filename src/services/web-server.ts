@@ -347,6 +347,7 @@ export default class WebServer {
         volume: player.getVolume(),
         speed: player.getSpeed(),
         effect: player.getEffect(),
+        eq: player.getEq(),
       });
     });
 
@@ -501,6 +502,29 @@ export default class WebServer {
         }
 
         res.json({ok: true, effect: player.getEffect()});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    this.app.post('/api/guilds/:guildId/eq', auth, async (req: express.Request, res: express.Response) => {
+      const {bass, mid, treble} = req.body as {bass?: number; mid?: number; treble?: number};
+      if (
+        typeof bass !== 'number' || typeof mid !== 'number' || typeof treble !== 'number'
+        || [bass, mid, treble].some(v => v < -12 || v > 12)
+      ) {
+        res.status(400).json({error: 'EQ values must be numbers between -12 and 12'});
+        return;
+      }
+
+      try {
+        const player = this.playerManager.get(req.params.guildId);
+        player.setEq(bass, mid, treble);
+        if (player.status === STATUS.PLAYING) {
+          await player.seek(player.getPosition());
+        }
+
+        res.json({ok: true, eq: player.getEq()});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }

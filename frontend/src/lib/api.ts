@@ -22,6 +22,7 @@ export interface PlayerStatus {
   volume:     number
   speed:      number
   effect:     AudioEffect
+  eq:         { bass: number; mid: number; treble: number }
 }
 
 // ── Client ───────────────────────────────────────────────────────────────────
@@ -107,3 +108,5 @@ export const setSpeed  = (t: string, guildId: string, speed: number) =>
   req('POST', `/api/guilds/${guildId}/speed`, t, { speed })
 export const setEffect = (t: string, guildId: string, effect: AudioEffect) =>
   req('POST', `/api/guilds/${guildId}/effect`, t, { effect })
+export const setEq = (t: string, guildId: string, bass: number, mid: number, treble: number) =>
+  req('POST', `/api/guilds/${guildId}/eq`, t, { bass, mid, treble })
