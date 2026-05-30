@@ -72,22 +72,25 @@ export default class FileCacheProvider {
     const stream = createWriteStream(tmpPath);
 
     stream.on('close', async () => {
-      // Only move if size is non-zero (may have errored out)
-      const stats = await fs.stat(tmpPath);
+      try {
+        // Only move if size is non-zero (may have errored out)
+        const stats = await fs.stat(tmpPath);
 
-      if (stats.size !== 0) {
-        await fs.rename(tmpPath, finalPath);
+        if (stats.size !== 0) {
+          await fs.rename(tmpPath, finalPath);
 
-        await prisma.fileCache.create({
-          data: {
-            hash,
-            accessedAt: new Date(),
-            bytes: stats.size,
-          },
-        });
+          // Use upsert so concurrent writes to the same hash don't crash the process.
+          await prisma.fileCache.upsert({
+            where: {hash},
+            create: {hash, accessedAt: new Date(), bytes: stats.size},
+            update: {accessedAt: new Date(), bytes: stats.size},
+          });
+        }
+
+        await this.evictOldestIfNecessary();
+      } catch (err: unknown) {
+        debug(`File cache write error for ${hash}: ${String(err)}`);
       }
-
-      await this.evictOldestIfNecessary();
     });
 
     return stream;
