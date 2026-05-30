@@ -119,30 +119,14 @@ export default class {
       throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
     }
 
-    // Batch-fetch album thumbnails from the Spotify Web API (50 per request).
-    // getTracks works with Client Credentials even when getPlaylist returns 403.
-    // All batches fire in parallel; individual failures leave thumbnailUrl as null.
-    const trackIds = rawTracks.map(t => t.uri?.split(':')[2]).filter((id): id is string => Boolean(id));
-    const batches = Array.from({length: Math.ceil(trackIds.length / 50)}, (_, i) =>
-      trackIds.slice((i * 50), (i * 50) + 50),
-    );
-    const thumbnailMap = new Map<string, string>();
-    const batchResults = await Promise.allSettled(batches.map(async batch => this.spotify.getTracks(batch)));
-    for (const result of batchResults) {
-      if (result.status === 'fulfilled') {
-        for (const track of result.value.body.tracks) {
-          if (track?.album?.images?.[0]?.url) {
-            thumbnailMap.set(track.id, track.album.images[0].url);
-          }
-        }
-      }
-    }
-
+    // Return tracks immediately — no blocking thumbnail fetch.
+    // Awaiting this.spotify.getTracks() caused playlists to hang when the
+    // Client Credentials token was expired or rate-limited.
     const tracks: SpotifyTrack[] = rawTracks.map(t => ({
       name: t.name,
       artist: t.artist ?? '',
       durationSeconds: Math.round((t.duration ?? 0) / 1000),
-      thumbnailUrl: thumbnailMap.get(t.uri?.split(':')[2] ?? '') ?? null,
+      thumbnailUrl: null,
     }));
 
     const playlist = {
