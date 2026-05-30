@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Music2, ChevronDown, Sliders, Radio } from 'lucide-react'
+import { Music2, ChevronDown } from 'lucide-react'
 import {
   getGuilds, getChannels, getStatus,
   ApiError,
@@ -24,7 +24,8 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [guildId,   setGuildId]   = useState<string>(() => localStorage.getItem('muse_guild') ?? '')
   const [channelId, setChannelId] = useState<string>('')
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
-  const [view,      setView]      = useState<'player' | 'dj' | 'autodj'>('player')
+  // DJ and Auto DJ views exist as components but are not yet exposed in the UI.
+  const [_view] = useState<'player' | 'dj' | 'autodj'>('player')
 
   // ── Load guilds on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -105,35 +106,6 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
             <span className="font-bold text-app-text text-base tracking-tight">Muse</span>
           </div>
 
-          {/* View tabs */}
-          <div className="flex items-center gap-1 bg-app-panel rounded-xl p-1 border border-app-border">
-            <button
-              onClick={() => setView('player')}
-              className={view === 'player'
-                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-app-surface text-app-text text-xs font-medium shadow-sm'
-                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
-            >
-              <Music2 size={12} /> Player
-            </button>
-            <button
-              onClick={() => setView('dj')}
-              className={view === 'dj'
-                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm'
-                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
-              style={view === 'dj' ? { background: '#f97316' } : {}}
-            >
-              <Sliders size={12} /> DJ
-            </button>
-            <button
-              onClick={() => setView('autodj')}
-              className={view === 'autodj'
-                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-medium shadow-sm'
-                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
-            >
-              <Radio size={12} /> Auto DJ
-            </button>
-          </div>
-
           {/* Guild selector */}
           {guilds.length > 0 && (
             <div className="relative">
@@ -157,9 +129,10 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       </header>
 
       {/* ── Main content ── */}
-      {view === 'dj' ? (
+      {/* DjDeckV3 and AutoDj components exist but are not yet in the nav */}
+      {_view === 'dj' ? (
         <DjDeckV3 status={status} token={token} guildId={guildId} onRefresh={poll} />
-      ) : view === 'autodj' ? (
+      ) : _view === 'autodj' ? (
         <AutoDj status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
         <main className="max-w-7xl mx-auto px-6 py-8">
