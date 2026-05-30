@@ -91,6 +91,7 @@ export default class {
   private speed = 1;
   private effect: AudioEffect = 'none';
   private eq = {bass: 0, mid: 0, treble: 0};
+  private crossfade = 0;
   private consecutivePlayErrors = 0;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
@@ -616,6 +617,14 @@ export default class {
     return {...this.eq};
   }
 
+  setCrossfade(seconds: number): void {
+    this.crossfade = Math.max(0, Math.min(8, seconds));
+  }
+
+  getCrossfade(): number {
+    return this.crossfade;
+  }
+
   // Resolve YouTube thumbnails for all queued Spotify tracks in the background.
   // Uses @distube/ytsr (fast, ~200-500ms per search) with concurrency 8 so a
   // 96-song playlist resolves in ~10-15 seconds.
@@ -709,6 +718,7 @@ export default class {
           ytdlpKill,
           cacheKey: song.url,
           cache: shouldCacheVideo,
+          songLength: song.length,
         });
       }
 
@@ -739,6 +749,7 @@ export default class {
       cacheKey: song.url,
       ffmpegInputOptions,
       cache: shouldCacheVideo,
+      songLength: song.length,
     });
   }
 
@@ -865,7 +876,7 @@ export default class {
     return ['-headers', `${headerLines}\r\n`];
   }
 
-  private async createReadStream(options: {input: string | Readable; ytdlpKill?: () => void; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean}): Promise<Readable> {
+  private async createReadStream(options: {input: string | Readable; ytdlpKill?: () => void; cacheKey: string; ffmpegInputOptions?: string[]; cache?: boolean; songLength?: number}): Promise<Readable> {
     return new Promise((resolve, reject) => {
       const capacitor = new WriteStream();
 
@@ -904,6 +915,16 @@ export default class {
 
       if (this.eq.treble !== 0) {
         activeFilters.push(`equalizer=f=8000:t=q:w=1.0:g=${this.eq.treble}`);
+      }
+
+      // Crossfade: fade-in at start, fade-out near the end of the track.
+      // Applied last so it wraps all other processing.
+      if (this.crossfade > 0) {
+        activeFilters.push(`afade=t=in:st=0:d=${this.crossfade}`);
+        const len = options.songLength ?? 0;
+        if (len > this.crossfade * 2) {
+          activeFilters.push(`afade=t=out:st=${len - this.crossfade}:d=${this.crossfade}`);
+        }
       }
 
       if (activeFilters.length > 0) {

@@ -348,6 +348,7 @@ export default class WebServer {
         speed: player.getSpeed(),
         effect: player.getEffect(),
         eq: player.getEq(),
+        crossfade: player.getCrossfade(),
       });
     });
 
@@ -528,6 +529,17 @@ export default class WebServer {
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }
+    });
+
+    this.app.post('/api/guilds/:guildId/crossfade', auth, (req: express.Request, res: express.Response) => {
+      const {seconds} = req.body as {seconds?: number};
+      if (typeof seconds !== 'number' || seconds < 0 || seconds > 8) {
+        res.status(400).json({error: 'Crossfade must be 0-8 seconds'});
+        return;
+      }
+
+      this.playerManager.get(req.params.guildId).setCrossfade(seconds);
+      res.json({ok: true, crossfade: seconds});
     });
 
     createServer(this.app).listen(this.port, () => {
