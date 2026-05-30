@@ -1,8 +1,8 @@
 -- Fix column-level DEFAULT for secondsToWaitAfterQueueEmpties from 30 to 600.
 -- SQLite cannot ALTER COLUMN DEFAULT, so the table must be rebuilt.
--- Explicit column list in INSERT avoids positional mismatch from prior
--- ALTER TABLE ADD COLUMN migrations which append columns at the end.
+-- Drop staging table first in case a previous partial run left it behind.
 PRAGMA foreign_keys=OFF;
+DROP TABLE IF EXISTS "new_Setting";
 CREATE TABLE "new_Setting" (
     "guildId" TEXT NOT NULL PRIMARY KEY,
     "playlistLimit" INTEGER NOT NULL DEFAULT 50,
