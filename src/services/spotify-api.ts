@@ -2,7 +2,7 @@ import {URL} from 'url';
 import {inject, injectable} from 'inversify';
 import * as spotifyURI from 'spotify-uri';
 import Spotify from 'spotify-web-api-node';
-import type {Track as SpotifyUrlInfoTrack} from 'spotify-url-info';
+import got from 'got';
 import {TYPES} from '../types.js';
 import ThirdParty from './third-party.js';
 import shuffle from 'array-shuffle';
@@ -79,8 +79,8 @@ export default class {
 
       return [this.limitTracks(items, playlistLimit).map(t => this.toSpotifyTrack(t, t.album?.images?.[0]?.url ?? null)), playlist];
     } catch {
-      // ── Attempt 2: spotify-url-info (scrapes Spotify web player, no auth) ──
-      return this.getPlaylistViaUrlInfo(url, playlistLimit);
+      // ── Attempt 2: scrape Spotify embed page directly (no auth required) ──
+      return this.getPlaylistViaEmbed(uri.id, url, playlistLimit);
     }
   }
 
@@ -100,38 +100,55 @@ export default class {
     );
   }
 
-  private async getPlaylistViaUrlInfo(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
-    // The package's default export is declared as an interface (type-only in TS)
-    // but at runtime it is a callable factory function.
-    type UrlInfoFactory = (f: typeof fetch) => {
-      getData: (url: string) => Promise<{name?: string}>;
-      getTracks: (url: string) => Promise<SpotifyUrlInfoTrack[]>;
-    };
-    const mod = await import('spotify-url-info') as unknown as {default: UrlInfoFactory};
-    const {getData, getTracks} = mod.default(fetch);
+  private async getPlaylistViaEmbed(playlistId: string, originalUrl: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
+    // Fetch Spotify's embed page directly with a browser User-Agent.
+    // The page embeds all track data as __NEXT_DATA__ JSON — no auth required.
+    // spotify-url-info did the same thing but stopped working because it
+    // didn't send a User-Agent header, causing Spotify to return a different page.
+    interface EmbedTrack {
+      uri?: string;
+      title?: string;
+      subtitle?: string;
+      duration?: number;
+    }
 
-    const [data, rawTracks] = await Promise.all([
-      getData(url) as Promise<{name?: string}>,
-      getTracks(url),
-    ]);
+    interface EmbedEntity {
+      name?: string;
+      title?: string;
+      trackList?: EmbedTrack[];
+    }
 
-    if (!rawTracks || rawTracks.length === 0) {
+    const html = await got(`https://open.spotify.com/embed/playlist/${playlistId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      timeout: {request: 15_000},
+    }).text();
+
+    const match = /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/.exec(html);
+    if (!match) {
+      throw new Error('Could not load Spotify playlist — embed page format may have changed.');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const pageData = JSON.parse(match[1]);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    const entity = pageData?.props?.pageProps?.state?.data?.entity as EmbedEntity | undefined;
+
+    if (!entity?.trackList?.length) {
       throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
     }
 
-    // Return tracks immediately — no blocking thumbnail fetch.
-    // Awaiting this.spotify.getTracks() caused playlists to hang when the
-    // Client Credentials token was expired or rate-limited.
-    const tracks: SpotifyTrack[] = rawTracks.map(t => ({
-      name: t.name,
-      artist: t.artist ?? '',
+    const tracks: SpotifyTrack[] = entity.trackList.map(t => ({
+      name: t.title ?? '',
+      artist: t.subtitle ?? '',
       durationSeconds: Math.round((t.duration ?? 0) / 1000),
       thumbnailUrl: null,
     }));
 
     const playlist = {
-      title: data.name ?? 'Spotify Playlist',
-      source: url,
+      title: entity.name ?? entity.title ?? 'Spotify Playlist',
+      source: originalUrl,
     };
 
     return [this.limitTracks(tracks, playlistLimit), playlist];
