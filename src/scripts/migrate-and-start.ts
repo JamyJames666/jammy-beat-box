@@ -97,5 +97,31 @@ const hasDatabaseBeenMigratedToPrisma = async () => {
 
   spinner.succeed('Database migrations applied.');
 
+  // The 20260530000000 migration accidentally omitted several Setting columns.
+  // Guard: after every deploy, ensure all required columns exist and add any
+  // that are missing. ALTER TABLE ADD COLUMN is a no-op if the col is there;
+  // if not, it is added with the correct default so Prisma stops crashing.
+  const healClient = new Prisma.PrismaClient();
+  try {
+    const rows = await healClient.$queryRaw<Array<{name: string}>>`PRAGMA table_info("Setting")`;
+    const existing = new Set(rows.map((r: {name: string}) => r.name));
+    const missing: Array<[string, string]> = [
+      ['queueAddResponseEphemeral', 'BOOLEAN NOT NULL DEFAULT false'],
+      ['defaultVolume', 'INTEGER NOT NULL DEFAULT 100'],
+      ['defaultQueuePageSize', 'INTEGER NOT NULL DEFAULT 10'],
+      ['turnDownVolumeWhenPeopleSpeak', 'BOOLEAN NOT NULL DEFAULT false'],
+      ['turnDownVolumeWhenPeopleSpeakTarget', 'INTEGER NOT NULL DEFAULT 20'],
+    ].filter(([col]) => !existing.has(col)) as Array<[string, string]>;
+
+    for (const [col, def] of missing) {
+      // eslint-disable-next-line no-await-in-loop
+      await healClient.$executeRawUnsafe(`ALTER TABLE "Setting" ADD COLUMN "${col}" ${def}`);
+    }
+  } catch {
+    // Table doesn't exist yet on a brand-new database — migrations will create it.
+  }
+
+  await healClient.$disconnect();
+
   await startBot();
 })();

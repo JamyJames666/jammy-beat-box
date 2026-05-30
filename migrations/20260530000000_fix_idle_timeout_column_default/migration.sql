@@ -4,24 +4,33 @@
 PRAGMA foreign_keys=OFF;
 DROP TABLE IF EXISTS "new_Setting";
 CREATE TABLE "new_Setting" (
-    "guildId" TEXT NOT NULL PRIMARY KEY,
-    "playlistLimit" INTEGER NOT NULL DEFAULT 50,
-    "secondsToWaitAfterQueueEmpties" INTEGER NOT NULL DEFAULT 600,
-    "leaveIfNoListeners" BOOLEAN NOT NULL DEFAULT true,
-    "autoAnnounceNextSong" BOOLEAN NOT NULL DEFAULT false,
-    "announcementChannelId" TEXT,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL
+    "guildId"                             TEXT    NOT NULL PRIMARY KEY,
+    "playlistLimit"                       INTEGER NOT NULL DEFAULT 50,
+    "secondsToWaitAfterQueueEmpties"      INTEGER NOT NULL DEFAULT 600,
+    "leaveIfNoListeners"                  BOOLEAN NOT NULL DEFAULT true,
+    "queueAddResponseEphemeral"           BOOLEAN NOT NULL DEFAULT false,
+    "autoAnnounceNextSong"                BOOLEAN NOT NULL DEFAULT false,
+    "defaultVolume"                       INTEGER NOT NULL DEFAULT 100,
+    "defaultQueuePageSize"                INTEGER NOT NULL DEFAULT 10,
+    "turnDownVolumeWhenPeopleSpeak"       BOOLEAN NOT NULL DEFAULT false,
+    "turnDownVolumeWhenPeopleSpeakTarget" INTEGER NOT NULL DEFAULT 20,
+    "announcementChannelId"               TEXT,
+    "createdAt"                           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt"                           DATETIME NOT NULL
 );
 INSERT INTO "new_Setting" (
     "guildId", "playlistLimit", "secondsToWaitAfterQueueEmpties",
-    "leaveIfNoListeners", "autoAnnounceNextSong", "announcementChannelId",
-    "createdAt", "updatedAt"
+    "leaveIfNoListeners", "queueAddResponseEphemeral", "autoAnnounceNextSong",
+    "defaultVolume", "defaultQueuePageSize",
+    "turnDownVolumeWhenPeopleSpeak", "turnDownVolumeWhenPeopleSpeakTarget",
+    "announcementChannelId", "createdAt", "updatedAt"
 )
 SELECT
     "guildId", "playlistLimit", "secondsToWaitAfterQueueEmpties",
-    "leaveIfNoListeners", "autoAnnounceNextSong", "announcementChannelId",
-    "createdAt", "updatedAt"
+    "leaveIfNoListeners", "queueAddResponseEphemeral", "autoAnnounceNextSong",
+    "defaultVolume", "defaultQueuePageSize",
+    "turnDownVolumeWhenPeopleSpeak", "turnDownVolumeWhenPeopleSpeakTarget",
+    "announcementChannelId", "createdAt", "updatedAt"
 FROM "Setting";
 DROP TABLE "Setting";
 ALTER TABLE "new_Setting" RENAME TO "Setting";
