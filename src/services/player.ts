@@ -583,26 +583,39 @@ export default class {
   }
 
   // Resolve YouTube thumbnails for all queued Spotify tracks in the background.
-  // Runs at most 3 searches concurrently so it doesn't hammer YouTube.
-  // The queue items are live references — thumbnailUrl updates are picked up
-  // by the status API on the next poll.
+  // Uses @distube/ytsr (fast, ~200-500ms per search) with concurrency 8 so a
+  // 96-song playlist resolves in ~10-15 seconds.
+  // Queue items are live references — thumbnailUrl updates are visible to the
+  // status API on the next poll without any extra endpoints.
   prefetchThumbnails(): void {
     const pending = this.queue.filter(s => s.url.startsWith('ytsearch1:') && !s.thumbnailUrl);
     if (pending.length === 0) {
       return;
     }
 
+    interface YtsrVideo {
+      type: string;
+      id: string;
+      thumbnail?: string;
+    }
+
     const resolveThumbnail = async (song: QueuedSong): Promise<void> => {
-      const query = song.url.slice('ytsearch1:'.length);
-      const result = await searchWithYtDlp(query);
-      if (result?.thumbnail && !song.thumbnailUrl) {
-        song.thumbnailUrl = result.thumbnail;
+      try {
+        const query = song.url.slice('ytsearch1:'.length);
+        const {default: ytsr} = await import('@distube/ytsr') as {default: (q: string, o: {limit: number}) => Promise<{items: YtsrVideo[]}>};
+        const results = await ytsr(query, {limit: 3});
+        const video = results.items.find(i => i.type === 'video');
+        if (video?.thumbnail && !song.thumbnailUrl) {
+          song.thumbnailUrl = video.thumbnail;
+        }
+      } catch {
+        // Non-fatal — thumbnail stays null
       }
     };
 
     void (async () => {
       const {default: pLimit} = await import('p-limit');
-      const limit = pLimit(3);
+      const limit = pLimit(8);
       await Promise.allSettled(pending.map(async song => limit(async () => resolveThumbnail(song))));
     })();
   }
