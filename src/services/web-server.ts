@@ -341,6 +341,7 @@ export default class WebServer {
           source: songSourceLabel(s),
         })),
         volume: player.getVolume(),
+        speed: player.getSpeed(),
       });
     });
 
@@ -439,6 +440,41 @@ export default class WebServer {
       try {
         this.playerManager.get(req.params.guildId).setVolume(level);
         res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    this.app.post('/api/guilds/:guildId/seek', auth, async (req: express.Request, res: express.Response) => {
+      const {position} = req.body as {position?: number};
+      if (typeof position !== 'number' || position < 0) {
+        res.status(400).json({error: 'Position must be a non-negative number'});
+        return;
+      }
+
+      try {
+        await this.playerManager.get(req.params.guildId).seek(position);
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    this.app.post('/api/guilds/:guildId/speed', auth, async (req: express.Request, res: express.Response) => {
+      const {speed} = req.body as {speed?: number};
+      if (typeof speed !== 'number' || speed < 0.5 || speed > 2) {
+        res.status(400).json({error: 'Speed must be between 0.5 and 2'});
+        return;
+      }
+
+      try {
+        const player = this.playerManager.get(req.params.guildId);
+        player.setSpeed(speed);
+        if (player.status === STATUS.PLAYING) {
+          await player.seek(player.getPosition());
+        }
+
+        res.json({ok: true, speed: player.getSpeed()});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }

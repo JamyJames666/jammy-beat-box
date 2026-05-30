@@ -76,6 +76,8 @@ export default class {
   private audioResource: AudioResource | null = null;
   private volume?: number;
   private defaultVolume: number = DEFAULT_VOLUME;
+  private speed = 1;
+  private consecutivePlayErrors = 0;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
@@ -266,7 +268,19 @@ export default class {
         this.startTrackingPosition(0);
         this.lastSongURL = currentSong.url;
       }
+
+      this.consecutivePlayErrors = 0;
     } catch (error: unknown) {
+      this.consecutivePlayErrors++;
+
+      // Stop the cascade after 3 consecutive failures to prevent the bot
+      // from rapidly skipping through the entire queue on e.g. a yt-dlp outage.
+      if (this.consecutivePlayErrors >= 3) {
+        this.consecutivePlayErrors = 0;
+        this.status = STATUS.IDLE;
+        return;
+      }
+
       await this.forward(1);
 
       if ((error as {statusCode: number}).statusCode === 410 && currentSong) {
@@ -560,6 +574,14 @@ export default class {
     return this.volume ?? this.defaultVolume;
   }
 
+  setSpeed(speed: number): void {
+    this.speed = Math.max(0.5, Math.min(2, speed));
+  }
+
+  getSpeed(): number {
+    return this.speed;
+  }
+
   private getHashForCache(url: string): string {
     return hasha(url);
   }
@@ -781,11 +803,17 @@ export default class {
         ? (options?.ffmpegInputOptions ?? ['-re'])
         : [];
 
-      const stream = ffmpeg(options.input)
+      const ffmpegCmd = ffmpeg(options.input)
         .inputOptions(inputOptions)
         .noVideo()
         .audioCodec('libopus')
-        .outputFormat('webm')
+        .outputFormat('webm');
+
+      if (this.speed !== 1) {
+        ffmpegCmd.audioFilters([`atempo=${this.speed}`]);
+      }
+
+      const stream = ffmpegCmd
         .on('error', error => {
           if (!hasReturnedStreamClosed) {
             reject(error);

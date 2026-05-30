@@ -18,6 +18,7 @@ export interface PlayerStatus {
   position:   number
   queue:      TrackInfo[]
   volume:     number
+  speed:      number
 }
 
 // ── Client ───────────────────────────────────────────────────────────────────
@@ -97,3 +98,7 @@ export const remove     = (t: string, guildId: string, index: number) =>
   req('POST', `/api/guilds/${guildId}/queue/remove`, t, { index })
 export const setVolume = (t: string, guildId: string, level: number) =>
   req('POST', `/api/guilds/${guildId}/volume`, t, { level })
+export const seek     = (t: string, guildId: string, position: number) =>
+  req('POST', `/api/guilds/${guildId}/seek`, t, { position })
+export const setSpeed = (t: string, guildId: string, speed: number) =>
+  req('POST', `/api/guilds/${guildId}/speed`, t, { speed })
