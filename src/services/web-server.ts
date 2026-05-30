@@ -303,6 +303,10 @@ export default class WebServer {
           await player.play();
         }
 
+        // Resolve YouTube thumbnails for queued Spotify tracks in the background.
+        // Results appear in the queue UI as each search completes (~3 concurrent).
+        player.prefetchThumbnails();
+
         // Announce to Discord that the web dashboard added songs
         const announceCh = await findAnnouncementChannel(this.client, req.params.guildId);
         if (announceCh) {

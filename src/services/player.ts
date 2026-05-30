@@ -582,6 +582,31 @@ export default class {
     return this.speed;
   }
 
+  // Resolve YouTube thumbnails for all queued Spotify tracks in the background.
+  // Runs at most 3 searches concurrently so it doesn't hammer YouTube.
+  // The queue items are live references — thumbnailUrl updates are picked up
+  // by the status API on the next poll.
+  prefetchThumbnails(): void {
+    const pending = this.queue.filter(s => s.url.startsWith('ytsearch1:') && !s.thumbnailUrl);
+    if (pending.length === 0) {
+      return;
+    }
+
+    const resolveThumbnail = async (song: QueuedSong): Promise<void> => {
+      const query = song.url.slice('ytsearch1:'.length);
+      const result = await searchWithYtDlp(query);
+      if (result?.thumbnail && !song.thumbnailUrl) {
+        song.thumbnailUrl = result.thumbnail;
+      }
+    };
+
+    void (async () => {
+      const {default: pLimit} = await import('p-limit');
+      const limit = pLimit(3);
+      await Promise.allSettled(pending.map(async song => limit(async () => resolveThumbnail(song))));
+    })();
+  }
+
   private getHashForCache(url: string): string {
     return hasha(url);
   }
