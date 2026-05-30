@@ -1,11 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, SkipForward, Square, Volume2 } from 'lucide-react'
 import * as Slider from '@radix-ui/react-slider'
-import { pause, resume, skip, stop, setVolume, seek, setSpeed, type PlayerStatus } from '@/lib/api'
+import { pause, resume, skip, stop, setVolume, seek, setSpeed, setEffect, type PlayerStatus, type AudioEffect } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
-const SPEED_OPTIONS = [1, 1.25, 1.5, 2] as const
+const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const
+
+const EFFECTS: { id: AudioEffect; label: string; emoji: string }[] = [
+  { id: 'none',      label: 'Normal',    emoji: '▶' },
+  { id: 'bass',      label: 'Bass+',     emoji: '🔈' },
+  { id: 'treble',    label: 'Treble+',   emoji: '🎵' },
+  { id: 'reverb',    label: 'Reverb',    emoji: '🌊' },
+  { id: '8d',        label: '8D',        emoji: '🎧' },
+  { id: 'nightcore', label: 'Nightcore', emoji: '⚡' },
+  { id: 'vaporwave', label: 'Vapour',    emoji: '🌸' },
+]
 
 interface Props {
   status: PlayerStatus | null
@@ -72,7 +82,8 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
   const isPlaying = status?.status === 'PLAYING'
   const active    = status?.status === 'PLAYING' || status?.status === 'PAUSED'
   const np        = status?.nowPlaying ?? null
-  const currentSpeed = status?.speed ?? 1
+  const currentSpeed  = status?.speed  ?? 1
+  const currentEffect = status?.effect ?? 'none'
 
   const handlePause = async () => {
     await (isPlaying ? pause(token, guildId) : resume(token, guildId)).catch(() => null)
@@ -97,6 +108,11 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
   // ── Speed ────────────────────────────────────────────────────────────────
   const handleSpeed = async (s: number) => {
     await setSpeed(token, guildId, s).catch(() => null)
+    onRefresh()
+  }
+
+  const handleEffect = async (fx: AudioEffect) => {
+    await setEffect(token, guildId, fx).catch(() => null)
     onRefresh()
   }
 
@@ -216,6 +232,26 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Effects row */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest mr-1 flex-shrink-0">FX</span>
+            {EFFECTS.map(fx => (
+              <button
+                key={fx.id}
+                onClick={() => handleEffect(fx.id)}
+                title={fx.label}
+                className={cn(
+                  'text-xs px-2.5 py-1 rounded-lg transition-colors font-medium',
+                  currentEffect === fx.id
+                    ? 'bg-app-accent text-white'
+                    : 'text-app-muted hover:text-app-text hover:bg-app-panel',
+                )}
+              >
+                {fx.emoji} {fx.label}
+              </button>
+            ))}
           </div>
 
           {/* Volume row */}

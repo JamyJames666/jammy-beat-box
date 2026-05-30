@@ -9,7 +9,7 @@ import {TYPES} from '../types.js';
 import Config from './config.js';
 import PlayerManager from '../managers/player.js';
 import GetSongs from './get-songs.js';
-import {STATUS} from './player.js';
+import {STATUS, type AudioEffect, AUDIO_EFFECT_FILTERS} from './player.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {prisma} from '../utils/db.js';
 
@@ -346,6 +346,7 @@ export default class WebServer {
         })),
         volume: player.getVolume(),
         speed: player.getSpeed(),
+        effect: player.getEffect(),
       });
     });
 
@@ -479,6 +480,27 @@ export default class WebServer {
         }
 
         res.json({ok: true, speed: player.getSpeed()});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    this.app.post('/api/guilds/:guildId/effect', auth, async (req: express.Request, res: express.Response) => {
+      const {effect} = req.body as {effect?: string};
+      const valid = Object.keys(AUDIO_EFFECT_FILTERS) as AudioEffect[];
+      if (!effect || !valid.includes(effect as AudioEffect)) {
+        res.status(400).json({error: `Effect must be one of: ${valid.join(', ')}`});
+        return;
+      }
+
+      try {
+        const player = this.playerManager.get(req.params.guildId);
+        player.setEffect(effect as AudioEffect);
+        if (player.status === STATUS.PLAYING) {
+          await player.seek(player.getPosition());
+        }
+
+        res.json({ok: true, effect: player.getEffect()});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }

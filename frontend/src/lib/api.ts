@@ -12,6 +12,8 @@ export interface TrackInfo {
   source?:      'youtube' | 'spotify'
 }
 
+export type AudioEffect = 'none' | 'bass' | 'treble' | 'reverb' | '8d' | 'nightcore' | 'vaporwave'
+
 export interface PlayerStatus {
   status:     'PLAYING' | 'PAUSED' | 'IDLE'
   nowPlaying: TrackInfo | null
@@ -19,6 +21,7 @@ export interface PlayerStatus {
   queue:      TrackInfo[]
   volume:     number
   speed:      number
+  effect:     AudioEffect
 }
 
 // ── Client ───────────────────────────────────────────────────────────────────
@@ -100,5 +103,7 @@ export const setVolume = (t: string, guildId: string, level: number) =>
   req('POST', `/api/guilds/${guildId}/volume`, t, { level })
 export const seek     = (t: string, guildId: string, position: number) =>
   req('POST', `/api/guilds/${guildId}/seek`, t, { position })
-export const setSpeed = (t: string, guildId: string, speed: number) =>
+export const setSpeed  = (t: string, guildId: string, speed: number) =>
   req('POST', `/api/guilds/${guildId}/speed`, t, { speed })
+export const setEffect = (t: string, guildId: string, effect: AudioEffect) =>
+  req('POST', `/api/guilds/${guildId}/effect`, t, { effect })

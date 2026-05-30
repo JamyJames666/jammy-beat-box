@@ -63,6 +63,18 @@ export interface PlayerEvents {
 
 export const DEFAULT_VOLUME = 100;
 
+export type AudioEffect = 'none' | 'bass' | 'treble' | 'reverb' | '8d' | 'nightcore' | 'vaporwave';
+
+export const AUDIO_EFFECT_FILTERS: Record<AudioEffect, string[]> = {
+  none: [],
+  bass: ['bass=g=10'],
+  treble: ['treble=g=8'],
+  reverb: ['aecho=0.8:0.88:60|69:0.4|0.3'],
+  '8d': ['apulsator=hz=0.08'],
+  nightcore: ['asetrate=48000*1.25', 'aresample=48000'],
+  vaporwave: ['asetrate=44100*0.8', 'aresample=44100'],
+};
+
 export default class {
   public voiceConnection: VoiceConnection | null = null;
   public status = STATUS.PAUSED;
@@ -77,6 +89,7 @@ export default class {
   private volume?: number;
   private defaultVolume: number = DEFAULT_VOLUME;
   private speed = 1;
+  private effect: AudioEffect = 'none';
   private consecutivePlayErrors = 0;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
@@ -582,6 +595,14 @@ export default class {
     return this.speed;
   }
 
+  setEffect(effect: AudioEffect): void {
+    this.effect = effect;
+  }
+
+  getEffect(): AudioEffect {
+    return this.effect;
+  }
+
   // Resolve YouTube thumbnails for all queued Spotify tracks in the background.
   // Uses @distube/ytsr (fast, ~200-500ms per search) with concurrency 8 so a
   // 96-song playlist resolves in ~10-15 seconds.
@@ -853,8 +874,15 @@ export default class {
         .audioCodec('libopus')
         .outputFormat('webm');
 
+      const activeFilters: string[] = [];
       if (this.speed !== 1) {
-        ffmpegCmd.audioFilters([`atempo=${this.speed}`]);
+        activeFilters.push(`atempo=${this.speed}`);
+      }
+
+      activeFilters.push(...AUDIO_EFFECT_FILTERS[this.effect]);
+
+      if (activeFilters.length > 0) {
+        ffmpegCmd.audioFilters(activeFilters);
       }
 
       const stream = ffmpegCmd
