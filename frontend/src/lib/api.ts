@@ -24,6 +24,8 @@ export interface PlayerStatus {
   effect:     AudioEffect
   eq:         { bass: number; mid: number; treble: number }
   crossfade:  number
+  loopSong:   boolean
+  loopQueue:  boolean
 }
 
 // ── Client ───────────────────────────────────────────────────────────────────
@@ -113,3 +115,7 @@ export const setEq = (t: string, guildId: string, bass: number, mid: number, tre
   req('POST', `/api/guilds/${guildId}/eq`, t, { bass, mid, treble })
 export const setCrossfade = (t: string, guildId: string, seconds: number) =>
   req('POST', `/api/guilds/${guildId}/crossfade`, t, { seconds })
+export const toggleLoopSong  = (t: string, guildId: string) =>
+  req('POST', `/api/guilds/${guildId}/loop-song`,  t)
+export const toggleLoopQueue = (t: string, guildId: string) =>
+  req('POST', `/api/guilds/${guildId}/loop-queue`, t)

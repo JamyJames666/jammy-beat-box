@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Music2, ChevronDown, Sliders, Zap } from 'lucide-react'
+import { Music2, ChevronDown, Sliders, Radio } from 'lucide-react'
 import {
   getGuilds, getChannels, getStatus,
   ApiError,
@@ -9,8 +9,8 @@ import NowPlaying from './NowPlaying'
 import QueueCard from './QueueCard'
 import AddToQueue from './AddToQueue'
 import BotSettings from './BotSettings'
-import DjDeck from './DjDeck'
 import DjDeckV3 from './DjDeckV3'
+import AutoDj from './AutoDj'
 
 interface Props {
   token: string
@@ -24,7 +24,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [guildId,   setGuildId]   = useState<string>(() => localStorage.getItem('muse_guild') ?? '')
   const [channelId, setChannelId] = useState<string>('')
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
-  const [view,      setView]      = useState<'player' | 'deck' | 'pro'>('player')
+  const [view,      setView]      = useState<'player' | 'dj' | 'autodj'>('player')
 
   // ── Load guilds on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -116,21 +116,21 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
               <Music2 size={12} /> Player
             </button>
             <button
-              onClick={() => setView('deck')}
-              className={view === 'deck'
-                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-app-accent text-white text-xs font-medium shadow-sm'
-                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
-            >
-              <Sliders size={12} /> DJ Deck
-            </button>
-            <button
-              onClick={() => setView('pro')}
-              className={view === 'pro'
+              onClick={() => setView('dj')}
+              className={view === 'dj'
                 ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white text-xs font-medium shadow-sm'
                 : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
-              style={view === 'pro' ? { background: '#f97316' } : {}}
+              style={view === 'dj' ? { background: '#f97316' } : {}}
             >
-              <Zap size={12} /> PRO
+              <Sliders size={12} /> DJ
+            </button>
+            <button
+              onClick={() => setView('autodj')}
+              className={view === 'autodj'
+                ? 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-700 text-white text-xs font-medium shadow-sm'
+                : 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-app-muted hover:text-app-text text-xs font-medium transition-colors'}
+            >
+              <Radio size={12} /> Auto DJ
             </button>
           </div>
 
@@ -157,10 +157,10 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       </header>
 
       {/* ── Main content ── */}
-      {view === 'pro' ? (
+      {view === 'dj' ? (
         <DjDeckV3 status={status} token={token} guildId={guildId} onRefresh={poll} />
-      ) : view === 'deck' ? (
-        <DjDeck status={status} token={token} guildId={guildId} onRefresh={poll} />
+      ) : view === 'autodj' ? (
+        <AutoDj status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
         <main className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">

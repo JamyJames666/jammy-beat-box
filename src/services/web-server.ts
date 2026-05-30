@@ -360,6 +360,8 @@ export default class WebServer {
         effect: player.getEffect(),
         eq: player.getEq(),
         crossfade: player.getCrossfade(),
+        loopSong: player.loopCurrentSong,
+        loopQueue: player.loopCurrentQueue,
       });
     });
 
@@ -551,6 +553,26 @@ export default class WebServer {
 
       this.playerManager.get(req.params.guildId).setCrossfade(seconds);
       res.json({ok: true, crossfade: seconds});
+    });
+
+    this.app.post('/api/guilds/:guildId/loop-song', auth, (req: express.Request, res: express.Response) => {
+      const player = this.playerManager.get(req.params.guildId);
+      player.loopCurrentSong = !player.loopCurrentSong;
+      if (player.loopCurrentSong) {
+        player.loopCurrentQueue = false;
+      }
+
+      res.json({ok: true, loopSong: player.loopCurrentSong});
+    });
+
+    this.app.post('/api/guilds/:guildId/loop-queue', auth, (req: express.Request, res: express.Response) => {
+      const player = this.playerManager.get(req.params.guildId);
+      player.loopCurrentQueue = !player.loopCurrentQueue;
+      if (player.loopCurrentQueue) {
+        player.loopCurrentSong = false;
+      }
+
+      res.json({ok: true, loopQueue: player.loopCurrentQueue});
     });
 
     createServer(this.app).listen(this.port, () => {
