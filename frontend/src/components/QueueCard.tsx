@@ -124,9 +124,11 @@ interface Props {
   token: string
   guildId: string
   onRefresh: () => void
+  pendingCount?: number
+  pendingPreview?: Array<{ title: string; artist: string }>
 }
 
-export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
+export default function QueueCard({ queue, token, guildId, onRefresh, pendingCount = 0, pendingPreview = [] }: Props) {
   // Optimistic local order to prevent flicker during DnD
   const [optimisticQueue, setOptimisticQueue] = useState<TrackInfo[] | null>(null)
   const displayQueue = optimisticQueue ?? queue
@@ -243,6 +245,29 @@ export default function QueueCard({ queue, token, guildId, onRefresh }: Props) {
             </ul>
           </SortableContext>
         </DndContext>
+      )}
+
+      {/* Pending songs — loaded lazily as the queue plays */}
+      {pendingCount > 0 && (
+        <div className="border-t border-app-border/50 pt-3 space-y-1.5">
+          <p className="text-[10px] font-semibold text-app-muted uppercase tracking-widest px-1">
+            {pendingCount} more song{pendingCount !== 1 ? 's' : ''} loading as queue plays
+          </p>
+          {pendingPreview.map((s, i) => (
+            <div key={i} className="flex items-center gap-2 px-2 py-1 rounded-lg opacity-50">
+              <Music size={10} className="text-app-border flex-shrink-0" />
+              <p className="text-xs text-app-muted truncate">
+                {s.title}
+                {s.artist ? <span className="text-app-border"> · {s.artist}</span> : null}
+              </p>
+            </div>
+          ))}
+          {pendingCount > pendingPreview.length && (
+            <p className="text-[10px] text-app-border px-2">
+              +{pendingCount - pendingPreview.length} more…
+            </p>
+          )}
+        </div>
       )}
     </div>
   )

@@ -24,8 +24,10 @@ export interface PlayerStatus {
   effect:     AudioEffect
   eq:         { bass: number; mid: number; treble: number }
   crossfade:  number
-  loopSong:   boolean
-  loopQueue:  boolean
+  loopSong:      boolean
+  loopQueue:     boolean
+  pendingCount:  number
+  pendingPreview: Array<{ title: string; artist: string }>
 }
 
 // ── Client ───────────────────────────────────────────────────────────────────

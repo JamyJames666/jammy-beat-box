@@ -84,6 +84,9 @@ export default class {
   private currentChannel: VoiceChannel | undefined;
   private queue: QueuedSong[] = [];
   private queuePosition = 0;
+  // Songs waiting to be moved into the active queue as it empties.
+  // Stored as plain SongMetadata (no addedInChannelId yet).
+  private pendingSongs: Array<{song: SongMetadata; channelId: string; requestedBy: string}> = [];
   private audioPlayer: AudioPlayer | null = null;
   private audioResource: AudioResource | null = null;
   private volume?: number;
@@ -471,11 +474,38 @@ export default class {
   }
 
   shuffle(): void {
-    const shuffledSongs = shuffle(this.queue.slice(this.queuePosition + 1));
+    // Shuffle the active queue AND pending together so the full set is randomised
+    const upcoming = this.queue.slice(this.queuePosition + 1);
+    const allUpcoming = [
+      ...upcoming.map(s => ({song: s as SongMetadata, channelId: s.addedInChannelId, requestedBy: s.requestedBy})),
+      ...this.pendingSongs,
+    ];
+    const shuffled = shuffle(allUpcoming);
 
-    this.queue = [...this.queue.slice(0, this.queuePosition + 1), ...shuffledSongs];
+    // First ACTIVE_SIZE go back into the live queue, rest stay pending
+    const ACTIVE_SIZE = 100;
+    const newActive: QueuedSong[] = shuffled.slice(0, ACTIVE_SIZE).map(p => ({
+      ...p.song,
+      addedInChannelId: p.channelId,
+      requestedBy: p.requestedBy,
+    }));
+    this.pendingSongs = shuffled.slice(ACTIVE_SIZE);
+    this.queue = [...this.queue.slice(0, this.queuePosition + 1), ...newActive];
   }
 
+  setPendingSongs(songs: Array<{song: SongMetadata; channelId: string; requestedBy: string}>): void {
+    this.pendingSongs = songs;
+  }
+
+  getPendingCount(): number {
+    return this.pendingSongs.length;
+  }
+
+  getPendingPreview(n = 10): SongMetadata[] {
+    return this.pendingSongs.slice(0, n).map(p => p.song);
+  }
+
+  // Pull up to `count` songs from pending into the active queue
   clear(): void {
     const newQueue = [];
 
@@ -667,6 +697,17 @@ export default class {
     })();
   }
 
+  private refillFromPending(count = 20): void {
+    const toAdd = this.pendingSongs.splice(0, count);
+    for (const p of toAdd) {
+      this.queue.push({...p.song, addedInChannelId: p.channelId, requestedBy: p.requestedBy} as QueuedSong);
+    }
+
+    if (toAdd.length > 0) {
+      this.prefetchThumbnails();
+    }
+  }
+
   private getHashForCache(url: string): string {
     return hasha(url);
   }
@@ -856,6 +897,12 @@ export default class {
     }
 
     if (newState.status === AudioPlayerStatus.Idle && this.status === STATUS.PLAYING) {
+      // Top up from pending when fewer than 20 songs remain
+      const remaining = this.queue.length - this.queuePosition - 1;
+      if (remaining < 20 && this.pendingSongs.length > 0) {
+        this.refillFromPending(20);
+      }
+
       await this.forward(1);
       // Auto announce the next song if configured to
       const settings = await getGuildSettings(this.guildId);

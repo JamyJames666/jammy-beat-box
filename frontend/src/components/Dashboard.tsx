@@ -166,6 +166,8 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
               token={token}
               guildId={guildId}
               onRefresh={poll}
+              pendingCount={status?.pendingCount ?? 0}
+              pendingPreview={status?.pendingPreview ?? []}
             />
 
           </div>

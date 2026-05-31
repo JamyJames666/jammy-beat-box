@@ -298,7 +298,18 @@ export default class WebServer {
           }
         }
 
-        songs.forEach(song => {
+        // First 100 go into the active queue; the rest become pending so
+        // the queue stays manageable and gets refilled as songs play.
+        const ACTIVE_LIMIT = 100;
+        const activeSongs = songs.slice(0, ACTIVE_LIMIT);
+        const pendingSongs = songs.slice(ACTIVE_LIMIT).map(s => ({
+          song: s,
+          channelId: targetChannelId,
+          requestedBy: 'web-dashboard',
+        }));
+        player.setPendingSongs([...player.getPendingCount() > 0 ? [] : [], ...pendingSongs]);
+
+        activeSongs.forEach(song => {
           player.add({
             ...song,
             addedInChannelId: targetChannelId,
@@ -362,6 +373,8 @@ export default class WebServer {
         crossfade: player.getCrossfade(),
         loopSong: player.loopCurrentSong,
         loopQueue: player.loopCurrentQueue,
+        pendingCount: player.getPendingCount(),
+        pendingPreview: player.getPendingPreview(10).map(s => ({title: s.title, artist: s.artist})),
       });
     });
 
