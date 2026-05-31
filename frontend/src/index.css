@@ -2,10 +2,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  /* Dark mode (default) — slightly warmer/fun purple-tinted darks */
+  --app-bg:          #0d0d18;
+  --app-surface:     #151524;
+  --app-panel:       #1c1c30;
+  --app-border:      #2a2a42;
+  --app-accent:      #8b5cf6;
+  --app-accent-dark: #7c3aed;
+  --app-text:        #e8e8f8;
+  --app-muted:       #7878a8;
+}
+
+html.light {
+  color-scheme: light;
+  /* Light mode — clean lavender-tinted whites */
+  --app-bg:          #f3f3fd;
+  --app-surface:     #ffffff;
+  --app-panel:       #eeeef8;
+  --app-border:      #d4d4e8;
+  --app-accent:      #7c3aed;
+  --app-accent-dark: #6d28d9;
+  --app-text:        #18182e;
+  --app-muted:       #6060a0;
+}
+
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
   html { color-scheme: dark; }
+  html.light { color-scheme: light; }
 
   body {
     @apply bg-app-bg text-app-text antialiased;

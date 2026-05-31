@@ -56,6 +56,11 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
         isDragging && 'opacity-40 shadow-glow z-10',
       )}
     >
+      {/* Number */}
+      <span className="text-[10px] tabular-nums text-app-border w-5 text-right flex-shrink-0 font-mono">
+        {index + 1}
+      </span>
+
       {/* Drag handle */}
       <button
         className="text-app-border hover:text-app-muted transition-colors flex-shrink-0

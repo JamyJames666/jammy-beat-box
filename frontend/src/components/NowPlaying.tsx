@@ -1,20 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Play, Pause, SkipForward, Square, Volume2 } from 'lucide-react'
-import * as Slider from '@radix-ui/react-slider'
-import { pause, resume, skip, stop, setVolume, seek, setSpeed, setEffect, type PlayerStatus, type AudioEffect } from '@/lib/api'
+import { Play, Pause, SkipForward, Square, Music } from 'lucide-react'
+import { pause, resume, skip, stop, seek, setSpeed, setEffect, type PlayerStatus, type AudioEffect } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const
 
-const EFFECTS: { id: AudioEffect; label: string; emoji: string }[] = [
-  { id: 'none',      label: 'Normal',    emoji: '▶' },
-  { id: 'bass',      label: 'Bass+',     emoji: '🔈' },
-  { id: 'treble',    label: 'Treble+',   emoji: '🎵' },
-  { id: 'reverb',    label: 'Reverb',    emoji: '🌊' },
-  { id: '8d',        label: '8D',        emoji: '🎧' },
-  { id: 'nightcore', label: 'Nightcore', emoji: '⚡' },
-  { id: 'vaporwave', label: 'Vapour',    emoji: '🌸' },
+// Each effect has a colour that shows when active
+const EFFECTS: { id: AudioEffect; label: string; color: string }[] = [
+  { id: 'none',      label: 'Normal',    color: 'bg-app-accent' },
+  { id: 'bass',      label: 'Bass+',     color: 'bg-pink-500' },
+  { id: 'treble',    label: 'Treble+',   color: 'bg-sky-500' },
+  { id: 'reverb',    label: 'Reverb',    color: 'bg-cyan-500' },
+  { id: '8d',        label: '8D',        color: 'bg-green-500' },
+  { id: 'nightcore', label: 'Nightcore', color: 'bg-orange-500' },
+  { id: 'vaporwave', label: 'Vapour',    color: 'bg-rose-400' },
 ]
 
 interface Props {
@@ -37,97 +37,57 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
 
   useEffect(() => {
     if (!status?.nowPlaying) { stopTick(); return }
-
     const np      = status.nowPlaying
     const playing = status.status === 'PLAYING'
     const srvPos  = status.position ?? 0
-
     if (np.url !== songUrl) {
-      setSongUrl(np.url)
-      setLocalPos(srvPos)
-      setLocalLen(np.length)
-      stopTick()
+      setSongUrl(np.url); setLocalPos(srvPos); setLocalLen(np.length); stopTick()
     } else {
       setLocalLen(np.length)
       if (Math.abs(localPos - srvPos) > 3) setLocalPos(srvPos)
     }
-
     if (playing && !tickRef.current) {
       const rate = status.speed ?? 1
-      tickRef.current = setInterval(() => {
-        setLocalPos(p => Math.min(p + rate, np.length))
-      }, 1000)
-    } else if (!playing) {
-      stopTick()
-    }
-
+      tickRef.current = setInterval(() => setLocalPos(p => Math.min(p + rate, np.length)), 1000)
+    } else if (!playing) { stopTick() }
     return stopTick
   }, [status]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Volume ────────────────────────────────────────────────────────────────
-  const [volDragging, setVolDragging] = useState(false)
-  const [volLocal,    setVolLocal]    = useState(100)
-
-  useEffect(() => {
-    if (!volDragging && status?.volume !== undefined) setVolLocal(status.volume)
-  }, [status?.volume, volDragging])
-
-  const handleVolumeCommit = useCallback(async (v: number[]) => {
-    setVolDragging(false)
-    await setVolume(token, guildId, v[0]).catch(() => null)
-    onRefresh()
-  }, [token, guildId, onRefresh])
-
-  // ── Controls ─────────────────────────────────────────────────────────────
-  const isPlaying = status?.status === 'PLAYING'
-  const active    = status?.status === 'PLAYING' || status?.status === 'PAUSED'
-  const np        = status?.nowPlaying ?? null
+  const isPlaying     = status?.status === 'PLAYING'
+  const active        = status?.status === 'PLAYING' || status?.status === 'PAUSED'
+  const np            = status?.nowPlaying ?? null
   const currentSpeed  = status?.speed  ?? 1
   const currentEffect = status?.effect ?? 'none'
+  const pct           = localLen > 0 ? Math.min(100, (localPos / localLen) * 100) : 0
 
-  const handlePause = async () => {
-    await (isPlaying ? pause(token, guildId) : resume(token, guildId)).catch(() => null)
-    onRefresh()
-  }
-  const handleSkip  = async () => { await skip(token, guildId).catch(() => null); onRefresh() }
-  const handleStop  = async () => { await stop(token, guildId).catch(() => null); onRefresh() }
+  const handlePause  = async () => { await (isPlaying ? pause(token, guildId) : resume(token, guildId)).catch(() => null); onRefresh() }
+  const handleSkip   = async () => { await skip(token, guildId).catch(() => null); onRefresh() }
+  const handleStop   = async () => { await stop(token, guildId).catch(() => null); onRefresh() }
+  const handleSpeed  = async (s: number) => { await setSpeed(token, guildId, s).catch(() => null); onRefresh() }
+  const handleEffect = async (fx: AudioEffect) => { await setEffect(token, guildId, fx).catch(() => null); onRefresh() }
 
   // ── Timeline click-to-seek ────────────────────────────────────────────────
   const progressRef = useRef<HTMLDivElement>(null)
-  const handleProgressClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleProgressClick = useCallback(async (e: React.MouseEvent<HTMLDivElement>) => {
     if (!active || localLen === 0) return
     const rect = progressRef.current?.getBoundingClientRect()
     if (!rect) return
-    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const position = Math.round(fraction * localLen)
+    const position = Math.round(Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * localLen)
     setLocalPos(position)
     await seek(token, guildId, position).catch(() => null)
     onRefresh()
-  }
-
-  // ── Speed ────────────────────────────────────────────────────────────────
-  const handleSpeed = async (s: number) => {
-    await setSpeed(token, guildId, s).catch(() => null)
-    onRefresh()
-  }
-
-  const handleEffect = async (fx: AudioEffect) => {
-    await setEffect(token, guildId, fx).catch(() => null)
-    onRefresh()
-  }
-
-  const pct = localLen > 0 ? Math.min(100, (localPos / localLen) * 100) : 0
+  }, [active, localLen, token, guildId, onRefresh])
 
   return (
-    <div className="card p-6 space-y-5">
+    <div className="card p-5 space-y-4">
       <h2 className="text-xs font-semibold text-app-muted uppercase tracking-widest">
         Now Playing
       </h2>
 
       {!active ? (
-        <div className="flex items-center gap-4 py-4">
-          <div className="w-16 h-16 rounded-2xl bg-app-panel flex items-center justify-center flex-shrink-0">
-            <Volume2 size={22} className="text-app-muted" />
+        <div className="flex items-center gap-4 py-3">
+          <div className="w-14 h-14 rounded-2xl bg-app-panel flex items-center justify-center flex-shrink-0">
+            <Music size={20} className="text-app-muted" />
           </div>
           <div>
             <p className="text-app-text font-medium">Nothing playing</p>
@@ -136,33 +96,27 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
         </div>
       ) : (
         <>
-          <div className="flex gap-5">
+          <div className="flex gap-4">
             {/* Thumbnail */}
             <div className="relative flex-shrink-0">
               {np?.thumbnailUrl ? (
-                <img
-                  src={np.thumbnailUrl}
-                  alt={np.title}
-                  className="w-28 h-28 rounded-2xl object-cover shadow-card"
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                />
+                <img src={np.thumbnailUrl} alt={np.title}
+                  className="w-24 h-24 rounded-2xl object-cover shadow-card"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
               ) : (
-                <div className="w-28 h-28 rounded-2xl bg-app-panel flex items-center justify-center">
-                  <Volume2 size={28} className="text-app-muted" />
+                <div className="w-24 h-24 rounded-2xl bg-app-panel flex items-center justify-center">
+                  <Music size={24} className="text-app-muted" />
                 </div>
               )}
-              <div className={cn(
-                'absolute bottom-2.5 right-2.5 flex items-end gap-[3px] h-5',
-                !isPlaying && 'opacity-0',
-              )}>
-                <span className="block w-1 bg-app-accent rounded-sm animate-bar" />
-                <span className="block w-1 bg-app-accent rounded-sm animate-bar-2" />
-                <span className="block w-1 bg-app-accent rounded-sm animate-bar-3" />
+              <div className={cn('absolute bottom-2 right-2 flex items-end gap-[2px] h-4', !isPlaying && 'opacity-0')}>
+                <span className="block w-[3px] bg-app-accent rounded-sm animate-bar" />
+                <span className="block w-[3px] bg-app-accent rounded-sm animate-bar-2" />
+                <span className="block w-[3px] bg-app-accent rounded-sm animate-bar-3" />
               </div>
             </div>
 
-            {/* Song info */}
-            <div className="flex-1 min-w-0 space-y-1.5">
+            {/* Song info + progress */}
+            <div className="flex-1 min-w-0 space-y-1">
               <p className="font-semibold text-app-text text-base leading-snug truncate" title={np?.title}>
                 {np?.title ?? '—'}
               </p>
@@ -170,22 +124,12 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
                 <p className="text-sm text-app-muted truncate">{np?.artist ?? '—'}</p>
                 {np?.source && <SourceBadge source={np.source} />}
               </div>
-
-              {/* Progress bar — clickable to seek */}
-              <div className="pt-3 space-y-1.5">
-                <div
-                  ref={progressRef}
-                  onClick={handleProgressClick}
-                  className={cn(
-                    'relative h-2 bg-app-border rounded-full overflow-hidden',
-                    active && 'cursor-pointer group',
-                  )}
-                  title="Click to seek"
-                >
-                  <div
-                    className="h-full bg-app-accent rounded-full transition-[width] duration-1000 group-hover:bg-violet-400"
-                    style={{ width: `${pct}%` }}
-                  />
+              <div className="pt-2 space-y-1">
+                <div ref={progressRef} onClick={handleProgressClick}
+                  className={cn('relative h-2 bg-app-border rounded-full overflow-hidden', active && 'cursor-pointer group')}
+                  title="Click to seek">
+                  <div className="h-full bg-app-accent rounded-full transition-[width] duration-1000 group-hover:opacity-80"
+                    style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex justify-between text-[11px] text-app-muted">
                   <span>{fmtTime(localPos)}</span>
@@ -195,84 +139,43 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
             </div>
           </div>
 
-          {/* Controls row */}
+          {/* Controls */}
           <div className="flex items-center gap-2 flex-wrap">
-            <button
-              className={cn(
-                'btn-secondary flex items-center gap-1.5 px-4 py-2 text-sm',
-                isPlaying && 'border-app-accent/40 text-app-accent',
-              )}
-              onClick={handlePause}
-            >
-              {isPlaying ? <><Pause size={15} /> Pause</> : <><Play size={15} /> Resume</>}
+            <button className={cn('btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-sm', isPlaying && 'border-app-accent/40 text-app-accent')} onClick={handlePause}>
+              {isPlaying ? <><Pause size={14} /> Pause</> : <><Play size={14} /> Resume</>}
             </button>
-
-            <button className="btn-secondary flex items-center gap-1.5 px-4 py-2 text-sm" onClick={handleSkip}>
-              <SkipForward size={15} /> Skip
+            <button className="btn-secondary flex items-center gap-1.5 px-3 py-1.5 text-sm" onClick={handleSkip}>
+              <SkipForward size={14} /> Skip
             </button>
-
-            <button className="btn-ghost flex items-center gap-1.5 px-4 py-2 text-sm" onClick={handleStop}>
-              <Square size={15} /> Stop
+            <button className="btn-ghost flex items-center gap-1.5 px-3 py-1.5 text-sm" onClick={handleStop}>
+              <Square size={14} /> Stop
             </button>
-
-            {/* Speed selector */}
-            <div className="flex items-center gap-1 ml-auto">
+            {/* Speed */}
+            <div className="flex items-center gap-1 ml-auto bg-app-panel rounded-lg p-0.5">
               {SPEED_OPTIONS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => handleSpeed(s)}
-                  className={cn(
-                    'text-xs px-2 py-1 rounded-lg transition-colors font-medium tabular-nums',
-                    currentSpeed === s
-                      ? 'bg-app-accent text-white'
-                      : 'text-app-muted hover:text-app-text hover:bg-app-panel',
-                  )}
-                >
-                  {s}x
+                <button key={s} onClick={() => handleSpeed(s)}
+                  className={cn('text-xs px-2 py-1 rounded-md transition-all font-mono font-medium',
+                    currentSpeed === s ? 'bg-app-surface text-app-text shadow-sm' : 'text-app-muted hover:text-app-text')}>
+                  {s}×
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Effects row */}
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-[10px] font-semibold text-app-muted uppercase tracking-widest mr-1 flex-shrink-0">FX</span>
+          {/* FX — single row, coloured active states */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-bold tracking-widest text-app-muted uppercase">FX</span>
             {EFFECTS.map(fx => (
-              <button
-                key={fx.id}
-                onClick={() => handleEffect(fx.id)}
-                title={fx.label}
+              <button key={fx.id} onClick={() => handleEffect(fx.id)}
                 className={cn(
-                  'text-xs px-2.5 py-1 rounded-lg transition-colors font-medium',
+                  'text-xs px-2.5 py-1 rounded-full transition-all font-medium border',
                   currentEffect === fx.id
-                    ? 'bg-app-accent text-white'
-                    : 'text-app-muted hover:text-app-text hover:bg-app-panel',
-                )}
-              >
-                {fx.emoji} {fx.label}
+                    ? `${fx.color} text-white border-transparent`
+                    : 'text-app-muted border-app-border hover:text-app-text hover:border-app-muted/40',
+                )}>
+                {fx.label}
               </button>
             ))}
-          </div>
-
-          {/* Volume row */}
-          <div className="flex items-center gap-2.5">
-            <Volume2 size={14} className="text-app-muted flex-shrink-0" />
-            <Slider.Root
-              className="relative flex items-center select-none touch-none w-32 h-5"
-              min={0} max={200} step={1}
-              value={[volLocal]}
-              onValueChange={v => { setVolDragging(true); setVolLocal(v[0]) }}
-              onValueCommit={handleVolumeCommit}
-            >
-              <Slider.Track className="bg-app-border relative grow rounded-full h-1.5">
-                <Slider.Range className="absolute bg-app-accent rounded-full h-full" />
-              </Slider.Track>
-              <Slider.Thumb
-                className="block w-3.5 h-3.5 bg-white rounded-full shadow
-                           focus:outline-none focus:ring-2 focus:ring-app-accent cursor-grab"
-              />
-            </Slider.Root>
-            <span className="text-xs text-app-muted w-8 text-right tabular-nums">{volLocal}</span>
           </div>
         </>
       )}

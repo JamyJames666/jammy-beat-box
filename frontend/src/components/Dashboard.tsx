@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Music2, ChevronDown } from 'lucide-react'
+import { Music2, ChevronDown, Sun, Moon } from 'lucide-react'
 import {
   getGuilds, getChannels, getStatus,
   ApiError,
@@ -26,6 +26,15 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
   // DJ and Auto DJ views exist as components but are not yet exposed in the UI.
   const [_view] = useState<'player' | 'dj' | 'autodj'>('player')
+
+  // Dark / light mode
+  const [theme, setTheme] = useState<'dark' | 'light'>(() =>
+    (localStorage.getItem('muse_theme') as 'dark' | 'light') ?? 'dark',
+  )
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', theme === 'light')
+    localStorage.setItem('muse_theme', theme)
+  }, [theme])
 
   // ── Load guilds on mount ────────────────────────────────────────────────────
   useEffect(() => {
@@ -105,6 +114,15 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
             </div>
             <span className="font-bold text-app-text text-base tracking-tight">Muse</span>
           </div>
+
+          {/* Dark/light toggle */}
+          <button
+            onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-app-muted hover:text-app-text hover:bg-app-panel transition-colors border border-app-border"
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
+          </button>
 
           {/* Guild selector */}
           {guilds.length > 0 && (
