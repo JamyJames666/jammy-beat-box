@@ -5,7 +5,6 @@ import Spotify from 'spotify-web-api-node';
 import got from 'got';
 import {TYPES} from '../types.js';
 import ThirdParty from './third-party.js';
-import shuffle from 'array-shuffle';
 import {QueuedPlaylist} from './player.js';
 
 export interface SpotifyTrack {
@@ -139,48 +138,48 @@ export default class {
       throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
     }
 
-    const tracks: SpotifyTrack[] = entity.trackList.map(t => ({
+    // Build a track list from the embed. The embed caps at ~100 tracks.
+    // Try the Spotify Web API to get the FULL list (with thumbnails where
+    // available). If the API works, use it entirely; if it 403s, fall back
+    // to the embed's ~100 as a baseline.
+    let tracks: SpotifyTrack[] = entity.trackList.map(t => ({
       name: t.title ?? '',
       artist: t.subtitle ?? '',
       durationSeconds: Math.round((t.duration ?? 0) / 1000),
       thumbnailUrl: null,
     }));
 
-    // The embed page returns ~100 tracks. If it hit that ceiling, try the
-    // Spotify Web API to fetch the remaining tracks (names/artists only,
-    // no thumbnails). Each extra song still queues and plays fine — YouTube
-    // is searched at play time, thumbnails load via prefetchThumbnails.
-    if (entity.trackList.length >= 100 && tracks.length < playlistLimit) {
-      try {
-        let offset = 100;
-        while (tracks.length < playlistLimit) {
-          // eslint-disable-next-line no-await-in-loop
-          const {body} = await this.spotify.getPlaylistTracks(playlistId, {limit: 50, offset});
-          const items = body.items
-            .map(i => i.track)
-            .filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t !== undefined && t.type === 'track');
-          if (items.length === 0) {
-            break;
-          }
-
-          for (const item of items) {
-            tracks.push({
-              name: item.name,
-              artist: item.artists[0]?.name ?? '',
-              durationSeconds: Math.round((item.duration_ms ?? 0) / 1000),
-              thumbnailUrl: item.album?.images?.[0]?.url ?? null,
-            });
-          }
-
-          if (!body.next) {
-            break;
-          }
-
-          offset += 50;
+    try {
+      const apiTracks: SpotifyTrack[] = [];
+      let offset = 0;
+      // Paginate from offset 0 so we get thumbnails + correct track order
+      while (apiTracks.length < playlistLimit) {
+        // eslint-disable-next-line no-await-in-loop
+        const {body} = await this.spotify.getPlaylistTracks(playlistId, {limit: 50, offset});
+        const items = body.items
+          .map(i => i.track)
+          .filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t !== undefined && t.type === 'track');
+        for (const item of items) {
+          apiTracks.push({
+            name: item.name,
+            artist: item.artists[0]?.name ?? '',
+            durationSeconds: Math.round((item.duration_ms ?? 0) / 1000),
+            thumbnailUrl: item.album?.images?.[0]?.url ?? null,
+          });
         }
-      } catch {
-        // Best-effort — stick with embed tracks if the API fails or returns 403
+
+        if (!body.next || items.length === 0) {
+          break;
+        }
+
+        offset += 50;
       }
+
+      if (apiTracks.length > 0) {
+        tracks = apiTracks;
+      }
+    } catch {
+      // API returned 403 or another error — use the embed's ~100 tracks
     }
 
     const playlist = {
@@ -201,6 +200,7 @@ export default class {
   }
 
   private limitTracks<T>(tracks: T[], limit: number): T[] {
-    return tracks.length > limit ? shuffle(tracks).slice(0, limit) : tracks;
+    // Take the first N in playlist order — user can shuffle from the web dashboard.
+    return tracks.length > limit ? tracks.slice(0, limit) : tracks;
   }
 }
