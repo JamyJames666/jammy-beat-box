@@ -146,6 +146,43 @@ export default class {
       thumbnailUrl: null,
     }));
 
+    // The embed page returns ~100 tracks. If it hit that ceiling, try the
+    // Spotify Web API to fetch the remaining tracks (names/artists only,
+    // no thumbnails). Each extra song still queues and plays fine — YouTube
+    // is searched at play time, thumbnails load via prefetchThumbnails.
+    if (entity.trackList.length >= 100 && tracks.length < playlistLimit) {
+      try {
+        let offset = 100;
+        while (tracks.length < playlistLimit) {
+          // eslint-disable-next-line no-await-in-loop
+          const {body} = await this.spotify.getPlaylistTracks(playlistId, {limit: 50, offset});
+          const items = body.items
+            .map(i => i.track)
+            .filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t !== undefined && t.type === 'track');
+          if (items.length === 0) {
+            break;
+          }
+
+          for (const item of items) {
+            tracks.push({
+              name: item.name,
+              artist: item.artists[0]?.name ?? '',
+              durationSeconds: Math.round((item.duration_ms ?? 0) / 1000),
+              thumbnailUrl: item.album?.images?.[0]?.url ?? null,
+            });
+          }
+
+          if (!body.next) {
+            break;
+          }
+
+          offset += 50;
+        }
+      } catch {
+        // Best-effort — stick with embed tracks if the API fails or returns 403
+      }
+    }
+
     const playlist = {
       title: entity.name ?? entity.title ?? 'Spotify Playlist',
       source: originalUrl,

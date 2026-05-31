@@ -631,7 +631,11 @@ export default class {
   // Queue items are live references — thumbnailUrl updates are visible to the
   // status API on the next poll without any extra endpoints.
   prefetchThumbnails(): void {
-    const pending = this.queue.filter(s => s.url.startsWith('ytsearch1:') && !s.thumbnailUrl);
+    // Cap at 50 so large playlists don't hammer YouTube all at once.
+    // Remaining thumbnails resolve naturally as each song starts playing.
+    const pending = this.queue
+      .filter(s => s.url.startsWith('ytsearch1:') && !s.thumbnailUrl)
+      .slice(0, 50);
     if (pending.length === 0) {
       return;
     }
