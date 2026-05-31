@@ -16,7 +16,7 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Shuffle, GripVertical, X, Music, Trash2, ListMusic } from 'lucide-react'
+import { Shuffle, GripVertical, X, Music, Trash2, ListMusic, ChevronsUp } from 'lucide-react'
 import { shuffle, clearQueue, move, remove, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
@@ -28,9 +28,10 @@ interface RowProps {
   item: TrackInfo
   index: number
   onRemove: (i: number) => void
+  onMoveToTop: (i: number) => void
 }
 
-function QueueRow({ id, item, index, onRemove }: RowProps) {
+function QueueRow({ id, item, index, onRemove, onMoveToTop }: RowProps) {
   const {
     attributes,
     listeners,
@@ -113,6 +114,21 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
         {fmtTime(item.length)}
       </span>
 
+      {/* Skip to top — only show when not already first */}
+      {index > 0 && (
+        <button
+          className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+          style={{ color: '#5a4a7a', background: 'transparent' }}
+          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(168,85,247,0.15)'; (e.currentTarget as HTMLElement).style.color = '#a855f7' }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#5a4a7a' }}
+          onClick={() => onMoveToTop(index)}
+          aria-label="Play next"
+          title="Play next"
+        >
+          <ChevronsUp size={15} />
+        </button>
+      )}
+
       {/* Remove */}
       <button
         className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
@@ -192,6 +208,20 @@ export default function QueueCard({ queue, token, guildId, onRefresh, pendingCou
     }
   }
 
+  const handleMoveToTop = async (index: number) => {
+    // Optimistic reorder
+    const next = [...displayQueue]
+    const [song] = next.splice(index, 1)
+    next.unshift(song)
+    setOptimisticQueue(next)
+    try {
+      await move(token, guildId, index + 1, 1)
+    } finally {
+      setOptimisticQueue(null)
+      onRefresh()
+    }
+  }
+
   return (
     <div className="card p-6 flex flex-col gap-5 min-h-[300px]">
       {/* Header */}
@@ -251,6 +281,7 @@ export default function QueueCard({ queue, token, guildId, onRefresh, pendingCou
                   item={item}
                   index={i}
                   onRemove={handleRemove}
+                  onMoveToTop={handleMoveToTop}
                 />
               ))}
             </ul>
