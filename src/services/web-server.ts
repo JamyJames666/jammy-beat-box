@@ -463,6 +463,23 @@ export default class WebServer {
       }
     });
 
+    // Replace a queued song's URL with an alternative version search
+    // (e.g. "radio edit", "lyric video"). Suffix is appended to "title artist".
+    this.app.post('/api/guilds/:guildId/queue/variant', auth, (req: express.Request, res: express.Response) => {
+      const {index, suffix} = req.body as {index?: number; suffix?: string};
+      if (typeof index !== 'number' || !suffix?.trim()) {
+        res.status(400).json({error: 'index and suffix are required'});
+        return;
+      }
+
+      try {
+        this.playerManager.get(req.params.guildId).replaceWithVariant(index, suffix.trim());
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
     this.app.post('/api/guilds/:guildId/volume', auth, (req: express.Request, res: express.Response) => {
       const {level} = req.body as {level?: number};
       if (typeof level !== 'number' || level < 0 || level > 200) {

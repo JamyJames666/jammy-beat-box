@@ -105,6 +105,8 @@ export const move       = (t: string, guildId: string, from: number, to: number)
   req('POST', `/api/guilds/${guildId}/queue/move`,   t, { from, to })
 export const remove     = (t: string, guildId: string, index: number) =>
   req('POST', `/api/guilds/${guildId}/queue/remove`, t, { index })
+export const setVariant = (t: string, guildId: string, index: number, suffix: string) =>
+  req('POST', `/api/guilds/${guildId}/queue/variant`, t, { index, suffix })
 export const setVolume = (t: string, guildId: string, level: number) =>
   req('POST', `/api/guilds/${guildId}/volume`, t, { level })
 export const seek     = (t: string, guildId: string, position: number) =>

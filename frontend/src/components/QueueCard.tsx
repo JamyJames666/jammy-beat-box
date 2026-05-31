@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Shuffle, GripVertical, X, Music, Trash2, ListMusic, ChevronsUp } from 'lucide-react'
-import { shuffle, clearQueue, move, remove, type TrackInfo } from '@/lib/api'
+import { shuffle, clearQueue, move, remove, setVariant, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
@@ -29,9 +29,10 @@ interface RowProps {
   index: number
   onRemove: (i: number) => void
   onMoveToTop: (i: number) => void
+  onVariant: (i: number, suffix: string) => void
 }
 
-function QueueRow({ id, item, index, onRemove, onMoveToTop }: RowProps) {
+function QueueRow({ id, item, index, onRemove, onMoveToTop, onVariant }: RowProps) {
   const {
     attributes,
     listeners,
@@ -106,6 +107,20 @@ function QueueRow({ id, item, index, onRemove, onMoveToTop }: RowProps) {
           <p className="text-sm truncate" style={{ color: '#9090c0' }}>{item.artist}</p>
           {item.source && <SourceBadge source={item.source} />}
         </div>
+      </div>
+
+      {/* Variant buttons — shown always, compact */}
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {(['radio edit', 'lyric video'] as const).map(v => (
+          <button key={v} onClick={() => onVariant(index, v)}
+            className="text-[10px] px-2 py-0.5 rounded-full font-medium border transition-all"
+            style={{ color: '#7878a8', borderColor: '#26263d', background: 'transparent' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#a855f7'; (e.currentTarget as HTMLElement).style.color = '#a855f7' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = '#26263d'; (e.currentTarget as HTMLElement).style.color = '#7878a8' }}
+            title={`Find ${v} on YouTube`}>
+            {v === 'radio edit' ? 'Radio' : 'Lyrics'}
+          </button>
+        ))}
       </div>
 
       {/* Duration */}
@@ -208,6 +223,11 @@ export default function QueueCard({ queue, token, guildId, onRefresh, pendingCou
     }
   }
 
+  const handleVariant = async (index: number, suffix: string) => {
+    await setVariant(token, guildId, index + 1, suffix).catch(() => null)
+    onRefresh()
+  }
+
   const handleMoveToTop = async (index: number) => {
     // Optimistic reorder
     const next = [...displayQueue]
@@ -282,6 +302,7 @@ export default function QueueCard({ queue, token, guildId, onRefresh, pendingCou
                   index={i}
                   onRemove={handleRemove}
                   onMoveToTop={handleMoveToTop}
+                  onVariant={handleVariant}
                 />
               ))}
             </ul>

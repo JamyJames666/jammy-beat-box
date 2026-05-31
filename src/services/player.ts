@@ -524,6 +524,20 @@ export default class {
     this.queue.splice(this.queuePosition + index, amount);
   }
 
+  // Replace a queued song's search query with an alternative version search.
+  // index is 1-based (same as the API convention for queue positions).
+  // suffix is appended to "title artist", e.g. "radio edit" or "lyric video".
+  replaceWithVariant(index: number, suffix: string): void {
+    const song = this.queue[this.queuePosition + index];
+    if (!song) {
+      return;
+    }
+
+    // Build new search from title + artist — handles both ytsearch and resolved IDs
+    song.url = `ytsearch1:${song.title} ${song.artist} ${suffix}`;
+    song.thumbnailUrl = null; // Resolved when the song plays
+  }
+
   shuffleQueue(): void {
     const upcoming = this.queue.splice(this.queuePosition + 1);
     this.queue.push(...shuffle(upcoming));
