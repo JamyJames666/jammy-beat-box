@@ -50,7 +50,18 @@
 
 @layer components {
   .card {
-    @apply bg-app-surface border border-app-border rounded-2xl shadow-card;
+    background: linear-gradient(160deg, #161628 0%, #111120 100%);
+    border: 1px solid #26263d;
+    border-radius: 1rem;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  /* Colourful section header */
+  .card h2 {
+    background: linear-gradient(90deg, #a855f7, #6366f1);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .btn {

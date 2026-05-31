@@ -51,8 +51,8 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
       style={style}
       className={cn(
         'flex items-center gap-3 rounded-xl px-3 py-3',
-        'bg-app-panel border border-transparent',
-        'hover:border-app-border hover:bg-[#1e1e2e] transition-all duration-150',
+        'border border-transparent transition-all duration-150',
+        'hover:border-[#3d2080] hover:bg-[#16162a]',
         isDragging && 'opacity-40 shadow-glow z-10',
       )}
     >
@@ -190,8 +190,8 @@ export default function QueueCard({ queue, token, guildId, onRefresh, pendingCou
     <div className="card p-6 flex flex-col gap-5 min-h-[300px]">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <ListMusic size={15} className="text-app-muted flex-shrink-0" />
-        <h2 className="text-xs font-semibold text-app-muted uppercase tracking-widest mr-auto">
+        <ListMusic size={15} className="flex-shrink-0" style={{ color: '#a855f7' }} />
+        <h2 className="text-xs font-semibold uppercase tracking-widest mr-auto" style={{ background: 'linear-gradient(90deg,#a855f7,#6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
           Queue
         </h2>
         {displayQueue.length > 0 && (
