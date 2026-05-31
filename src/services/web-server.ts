@@ -279,7 +279,7 @@ export default class WebServer {
       }
 
       try {
-        const [songs] = await this.getSongs.getSongs(query, 1000, false);
+        const [songs] = await this.getSongs.getSongs(query, 500, false);
         if (songs.length === 0) {
           res.status(400).json({error: 'No songs found'});
           return;

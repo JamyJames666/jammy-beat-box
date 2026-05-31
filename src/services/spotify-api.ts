@@ -138,10 +138,13 @@ export default class {
       throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
     }
 
-    // Build a track list from the embed. The embed caps at ~100 tracks.
-    // Try the Spotify Web API to get the FULL list (with thumbnails where
-    // available). If the API works, use it entirely; if it 403s, fall back
-    // to the embed's ~100 as a baseline.
+    // The embed gives the first ~100 tracks AND an anonymous access token
+    // that can call the real Spotify API for the full paginated list.
+    // Extract that token from __NEXT_DATA__ and use it with got directly.
+    const tokenMatch = /"accessToken":"([^"]+)"/.exec(match[1]);
+    const embedToken = tokenMatch?.[1] ?? null;
+
+    // Start with embed tracks as the baseline (~100, no thumbnails)
     let tracks: SpotifyTrack[] = entity.trackList.map(t => ({
       name: t.title ?? '',
       artist: t.subtitle ?? '',
@@ -149,37 +152,14 @@ export default class {
       thumbnailUrl: null,
     }));
 
-    try {
-      const apiTracks: SpotifyTrack[] = [];
-      let offset = 0;
-      // Paginate from offset 0 so we get thumbnails + correct track order
-      while (apiTracks.length < playlistLimit) {
-        // eslint-disable-next-line no-await-in-loop
-        const {body} = await this.spotify.getPlaylistTracks(playlistId, {limit: 50, offset});
-        const items = body.items
-          .map(i => i.track)
-          .filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t !== undefined && t.type === 'track');
-        for (const item of items) {
-          apiTracks.push({
-            name: item.name,
-            artist: item.artists[0]?.name ?? '',
-            durationSeconds: Math.round((item.duration_ms ?? 0) / 1000),
-            thumbnailUrl: item.album?.images?.[0]?.url ?? null,
-          });
-        }
-
-        if (!body.next || items.length === 0) {
-          break;
-        }
-
-        offset += 50;
+    // The __NEXT_DATA__ includes an anonymous access token Spotify's embed
+    // player uses to paginate tracks. Use it to fetch the full list via the
+    // official API — gets thumbnails and bypasses the ~100-track embed cap.
+    if (embedToken) {
+      const paginated = await this.paginateWithEmbedToken(embedToken, playlistId, playlistLimit);
+      if (paginated.length > 0) {
+        tracks = paginated;
       }
-
-      if (apiTracks.length > 0) {
-        tracks = apiTracks;
-      }
-    } catch {
-      // API returned 403 or another error — use the embed's ~100 tracks
     }
 
     const playlist = {
@@ -188,6 +168,53 @@ export default class {
     };
 
     return [this.limitTracks(tracks, playlistLimit), playlist];
+  }
+
+  private async paginateWithEmbedToken(token: string, playlistId: string, limit: number): Promise<SpotifyTrack[]> {
+    interface PageItem {
+      track: {
+        name: string;
+        type: string;
+        duration_ms: number;
+        artists: Array<{name: string}>;
+        album: {images: Array<{url: string}>};
+      } | null;
+    }
+
+    const tracks: SpotifyTrack[] = [];
+    const headers = {Authorization: `Bearer ${token}`};
+    let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=0`;
+
+    try {
+      while (nextUrl !== null && tracks.length < limit) {
+        // eslint-disable-next-line no-await-in-loop
+        const raw = await got(nextUrl, {headers, timeout: {request: 10_000}}).text();
+        const body = JSON.parse(raw) as {items: PageItem[]; next: string | null};
+        for (const item of body.items) {
+          if (item.track && item.track.type === 'track') {
+            tracks.push({
+              name: item.track.name,
+              artist: item.track.artists[0]?.name ?? '',
+              durationSeconds: Math.round((item.track.duration_ms ?? 0) / 1000),
+              thumbnailUrl: item.track.album?.images?.[0]?.url ?? null,
+            });
+          }
+        }
+
+        nextUrl = tracks.length < limit ? (body.next ?? null) : null;
+        if (nextUrl !== null) {
+          // Small pause between pages to avoid hitting Spotify's rate limit
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>(resolve => {
+            setTimeout(resolve, 200);
+          });
+        }
+      }
+    } catch {
+      // Token expired or rate-limited — return whatever we collected
+    }
+
+    return tracks;
   }
 
   private toSpotifyTrack(track: SpotifyApi.TrackObjectSimplified, thumbnailUrl: string | null = null): SpotifyTrack {
