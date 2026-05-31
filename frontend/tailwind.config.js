@@ -6,17 +6,17 @@ export default {
       colors: {
         // Design tokens — mirror the CSS custom props in index.css
         app: {
-          bg:           'var(--app-bg)',
-          surface:      'var(--app-surface)',
-          panel:        'var(--app-panel)',
-          border:       'var(--app-border)',
-          accent:       'var(--app-accent)',
-          'accent-dark':'var(--app-accent-dark)',
-          text:         'var(--app-text)',
-          muted:        'var(--app-muted)',
-          danger:       '#ef4444',
-          spotify:      '#1db954',
-          youtube:      '#ff0000',
+          bg:            '#0d0d18',
+          surface:       '#151524',
+          panel:         '#1c1c30',
+          border:        '#2a2a42',
+          accent:        '#8b5cf6',
+          'accent-dark': '#7c3aed',
+          text:          '#e8e8f8',
+          muted:         '#7878a8',
+          danger:        '#ef4444',
+          spotify:       '#1db954',
+          youtube:       '#ff0000',
         },
         // DJ Deck v3 tokens
         'deck-a':      '#3b82f6',
