@@ -27,6 +27,8 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-app-border rounded-full; }
   ::-webkit-scrollbar-thumb:hover { @apply bg-app-muted; }
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
 
   /* Range input (volume slider — used where Radix is overkill) */
   input[type='range'] {

@@ -162,18 +162,18 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
             </div>
           </div>
 
-          {/* FX — single row, coloured active states */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* FX — single scrollable row, coloured active states */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
             <span className="text-[10px] font-bold tracking-widest text-app-muted uppercase">FX</span>
             {EFFECTS.map(fx => (
               <button key={fx.id} onClick={() => handleEffect(fx.id)}
                 className={cn(
                   'text-xs px-2.5 py-1 rounded-full transition-all font-medium border',
                   currentEffect === fx.id
-                    ? `${fx.color} text-white border-transparent`
+                    ? `${fx.color} text-white border-transparent shadow-sm`
                     : 'text-app-muted border-app-border hover:text-app-text hover:border-app-muted/40',
                 )}>
-                {fx.label}
+                <span className="whitespace-nowrap">{fx.label}</span>
               </button>
             ))}
           </div>
