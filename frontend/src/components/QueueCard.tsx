@@ -48,28 +48,30 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
   return (
     <li
       ref={setNodeRef}
-      style={style}
+      style={{ ...style, background: isDragging ? '#26263d' : 'rgba(30,16,64,0.4)', borderColor: isDragging ? '#a855f7' : '#26263d' }}
       className={cn(
-        'flex items-center gap-3 rounded-xl px-3 py-3',
-        'border border-transparent transition-all duration-150',
-        'hover:border-[#3d2080] hover:bg-[#16162a]',
-        isDragging && 'opacity-40 shadow-glow z-10',
+        'flex items-center gap-3 rounded-xl px-4 py-3.5',
+        'border transition-all duration-150',
+        isDragging ? 'opacity-40 z-10' : '',
       )}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#1e1640'; (e.currentTarget as HTMLElement).style.borderColor = '#7c3aed' }}
+      onMouseLeave={e => { if (!isDragging) { (e.currentTarget as HTMLElement).style.background = 'rgba(30,16,64,0.4)'; (e.currentTarget as HTMLElement).style.borderColor = '#26263d' } }}
     >
       {/* Number */}
-      <span className="text-[10px] tabular-nums text-app-border w-5 text-right flex-shrink-0 font-mono">
+      <span className="text-xs tabular-nums w-6 text-right flex-shrink-0 font-mono font-bold"
+        style={{ color: '#5a4a7a' }}>
         {index + 1}
       </span>
 
       {/* Drag handle */}
       <button
-        className="text-app-border hover:text-app-muted transition-colors flex-shrink-0
-                   cursor-grab active:cursor-grabbing touch-none"
+        className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none transition-colors"
+        style={{ color: '#3d2d5a' }}
         {...attributes}
         {...listeners}
         aria-label="Drag to reorder"
       >
-        <GripVertical size={15} />
+        <GripVertical size={16} />
       </button>
 
       {/* Thumbnail */}
@@ -78,7 +80,8 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
           src={item.thumbnailUrl}
           alt=""
           loading="lazy"
-          className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-app-border"
+          className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
+          style={{ boxShadow: '0 2px 12px rgba(168,85,247,0.3)' }}
           onError={e => {
             const img = e.target as HTMLImageElement
             img.style.display = 'none'
@@ -87,36 +90,39 @@ function QueueRow({ id, item, index, onRemove }: RowProps) {
         />
       ) : null}
       <div
-        className="w-12 h-12 rounded-lg bg-app-border/60 flex items-center justify-center
-                   flex-shrink-0 text-app-muted"
-        style={item.thumbnailUrl ? { display: 'none' } : {}}
+        className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={item.thumbnailUrl ? { display: 'none' } : { background: 'linear-gradient(135deg,#2a1060,#1e1040)' }}
       >
-        <Music size={16} />
+        <Music size={20} style={{ color: '#7c3aed' }} />
       </div>
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-app-text truncate leading-snug" title={item.title}>
+        <p className="text-base font-semibold truncate leading-snug" style={{ color: '#f0f0ff' }} title={item.title}>
           {item.title}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          <p className="text-xs text-app-muted truncate">{item.artist}</p>
+          <p className="text-sm truncate" style={{ color: '#9090c0' }}>{item.artist}</p>
           {item.source && <SourceBadge source={item.source} />}
         </div>
       </div>
 
       {/* Duration */}
-      <span className="text-xs text-app-muted flex-shrink-0 tabular-nums font-mono">
+      <span className="text-sm flex-shrink-0 tabular-nums font-mono font-medium"
+        style={{ color: '#7070a0' }}>
         {fmtTime(item.length)}
       </span>
 
       {/* Remove */}
       <button
-        className="btn-danger flex-shrink-0"
+        className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all"
+        style={{ color: '#5a4a7a', background: 'transparent' }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(244,63,94,0.15)'; (e.currentTarget as HTMLElement).style.color = '#f43f5e' }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = '#5a4a7a' }}
         onClick={() => onRemove(index)}
         aria-label="Remove from queue"
       >
-        <X size={14} />
+        <X size={15} />
       </button>
     </li>
   )
