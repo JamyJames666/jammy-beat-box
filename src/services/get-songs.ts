@@ -177,7 +177,7 @@ export default class {
       artist: track.artist,
       // Use unquoted search — exact-phrase quoting breaks on special characters in
       // track/artist names and some yt-dlp versions mis-parse the nested quotes.
-      url: `ytsearch1:${track.name} ${track.artist}`,
+      url: `ytsearch1:${track.name} ${track.artist} lyric video`,
       length: track.durationSeconds,
       offset: 0,
       playlist: playlist ?? null,
