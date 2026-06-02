@@ -24,6 +24,7 @@ import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {buildPlayingMessageEmbed} from '../utils/build-embed.js';
 import {getYouTubeMediaSource, createYtDlpAudioStream, searchWithYtDlp} from '../utils/yt-dlp.js';
 import {Setting} from '@prisma/client';
+import https from 'https';
 
 export enum MediaSource {
   Youtube,
@@ -672,54 +673,57 @@ export default class {
     return this.crossfade;
   }
 
-  // Resolve YouTube thumbnails for all queued Spotify tracks in the background.
-  // Uses @distube/ytsr (fast, ~200-500ms per search) with concurrency 8 so a
-  // 96-song playlist resolves in ~10-15 seconds.
-  // Queue items are live references — thumbnailUrl updates are visible to the
-  // status API on the next poll without any extra endpoints.
+  // Resolve album-art thumbnails for queued and pending songs using the Deezer
+  // public search API (no auth required).  Queue items are live references —
+  // thumbnailUrl mutations appear in the status API on the next 2-second poll.
   prefetchThumbnails(): void {
-    // Resolve YouTube thumbnails for queued songs that have no thumbnail yet.
-    // Also backfill thumbnails for pending songs so they're ready when they enter the active queue.
-    // Cap at 60 total to avoid hammering YouTube.
-    const needsThumb = (url: string, thumb: string | null | undefined) =>
-      url.startsWith('ytsearch1:') && !thumb;
+    const noThumb = (s: SongMetadata) => !s.thumbnailUrl;
 
-    const activeNeedingThumb = (this.queue as Array<{url: string; thumbnailUrl?: string | null}>)
-      .filter(s => needsThumb(s.url, s.thumbnailUrl))
+    const active = this.queue
+      .filter(noThumb)
       .slice(0, 40);
 
-    const pendingNeedingThumb = this.pendingSongs
+    const pending = this.pendingSongs
       .map(p => p.song)
-      .filter(s => needsThumb(s.url, s.thumbnailUrl))
+      .filter(noThumb)
       .slice(0, 20);
 
-    const targets = [...activeNeedingThumb, ...pendingNeedingThumb];
+    const targets: SongMetadata[] = [...active, ...pending];
     if (targets.length === 0) return;
 
-    interface YtsrVideo {
-      type: string;
-      id: string;
-      thumbnail?: string;
-    }
+    const deezerLookup = (song: SongMetadata): Promise<void> =>
+      new Promise(resolve => {
+        if (song.thumbnailUrl) { resolve(); return; }
+        const q = encodeURIComponent(`${song.title} ${song.artist}`);
+        const req = https.get(
+          `https://api.deezer.com/search?q=${q}&limit=1`,
+          {headers: {'User-Agent': 'Mozilla/5.0'}},
+          (res: {on(e: string, cb: (...a: unknown[]) => void): void}) => {
+            let raw = '';
+            res.on('data', (chunk: unknown) => { raw += String(chunk); });
+            res.on('end', () => {
+              try {
+                const body = JSON.parse(raw) as {data?: Array<{album?: {cover_xl?: string; cover_medium?: string}}>};
+                const cover = body.data?.[0]?.album?.cover_xl ?? body.data?.[0]?.album?.cover_medium ?? null;
+                if (cover && !song.thumbnailUrl) {
+                  song.thumbnailUrl = cover;
+                }
+              } catch { /* malformed JSON — leave thumbnail null */ }
+              resolve();
+            });
+            res.on('error', () => resolve());
+          },
+        );
+        req.on('error', () => resolve());
+        req.setTimeout(5000, () => { req.destroy(); resolve(); });
+      });
 
-    const resolveThumbnail = async (song: {url: string; thumbnailUrl?: string | null}): Promise<void> => {
-      try {
-        const query = song.url.slice('ytsearch1:'.length);
-        const {default: ytsr} = await import('@distube/ytsr') as {default: (q: string, o: {limit: number}) => Promise<{items: YtsrVideo[]}>};
-        const results = await ytsr(query, {limit: 3});
-        const video = results.items.find(i => i.type === 'video');
-        if (video?.thumbnail && !song.thumbnailUrl) {
-          song.thumbnailUrl = video.thumbnail;
-        }
-      } catch {
-        // Non-fatal — thumbnail stays null
-      }
-    };
-
+    // Run 4 at a time without importing p-limit
     void (async () => {
-      const {default: pLimit} = await import('p-limit');
-      const limit = pLimit(6);
-      await Promise.allSettled(targets.map(song => limit(() => resolveThumbnail(song))));
+      const BATCH = 4;
+      for (let i = 0; i < targets.length; i += BATCH) {
+        await Promise.allSettled(targets.slice(i, i + BATCH).map(deezerLookup));
+      }
     })();
   }
 

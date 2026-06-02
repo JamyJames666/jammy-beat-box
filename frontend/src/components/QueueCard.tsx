@@ -260,12 +260,30 @@ export default function QueueCard({
       {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-5 pb-3 flex-shrink-0">
         <ListMusic size={14} className="flex-shrink-0 text-app-accent" />
-        <h2 className="text-sm font-semibold mr-auto">Up Next</h2>
-        {displayQueue.length > 0 && (
-          <span className="text-xs tabular-nums" style={{ color: '#666' }}>
-            {displayQueue.length} songs
-          </span>
-        )}
+        <h2 className="text-sm font-semibold">Up Next</h2>
+
+        {/* Song count + pending badge */}
+        <div className="flex items-center gap-2 mr-auto">
+          {displayQueue.length > 0 && (
+            <span className="text-xs tabular-nums" style={{ color: '#666' }}>
+              {displayQueue.length} songs
+            </span>
+          )}
+          {pendingCount > 0 && (
+            <button
+              onClick={handleBringToQueue}
+              disabled={bringingToQueue}
+              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full
+                         transition-all disabled:opacity-60 active:scale-95"
+              style={{ background: 'rgba(168,85,247,0.18)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.35)' }}
+              title="Click to load more songs into queue"
+            >
+              <ListPlus size={11} />
+              {bringingToQueue ? 'Loading…' : `+${pendingCount} more — click to load`}
+            </button>
+          )}
+        </div>
+
         <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"
           onClick={handleShuffle}
