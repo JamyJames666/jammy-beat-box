@@ -103,17 +103,38 @@ export default class {
       } catch { /* fall through */ }
     }
 
-    // Fall back to embed token
-    const html = await got(`https://open.spotify.com/embed/playlist/${uri.id}`, {
-      headers: {'User-Agent': BROWSER_UA},
-      timeout: {request: 15_000},
-    }).text();
-    const match = /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/.exec(html);
-    const embedToken = match ? (/"accessToken":"([^"]+)"/.exec(match[1])?.[1] ?? null) : null;
+    // Try up to 3 times with fresh embed tokens — rate limits are transient
+    // and a second fetch a few seconds later usually succeeds.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          // Short wait before retry so Spotify rate limits have a chance to clear
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>(resolve => {
+            setTimeout(resolve, attempt * 2000);
+          });
+        }
 
-    const token = embedToken ?? await this.getAnonymousToken(BROWSER_UA);
-    if (token) {
-      return this.paginateWithEmbedToken(token, uri.id, batchSize, startOffset);
+        // eslint-disable-next-line no-await-in-loop
+        const html = await got(`https://open.spotify.com/embed/playlist/${uri.id}`, {
+          headers: {'User-Agent': BROWSER_UA},
+          timeout: {request: 15_000},
+        }).text();
+        const match = /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/.exec(html);
+        const embedToken = match ? (/"accessToken":"([^"]+)"/.exec(match[1])?.[1] ?? null) : null;
+
+        // eslint-disable-next-line no-await-in-loop
+        const token = embedToken ?? await this.getAnonymousToken(BROWSER_UA);
+        if (!token) {
+          continue;
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        const tracks = await this.paginateWithEmbedToken(token, uri.id, batchSize, startOffset);
+        if (tracks.length > 0) {
+          return tracks;
+        }
+      } catch { /* try next attempt */ }
     }
 
     return [];

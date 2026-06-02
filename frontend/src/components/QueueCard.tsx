@@ -249,6 +249,7 @@ export default function QueueCard({
   }
 
   const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreMsg, setLoadMoreMsg] = useState<string | null>(null)
 
   const handleBringToQueue = async () => {
     setBringingToQueue(true)
@@ -259,9 +260,22 @@ export default function QueueCard({
 
   const handleLoadMore = async () => {
     setLoadingMore(true)
-    try { await loadMoreSpotify(token, guildId); onRefresh() }
-    catch { /* non-fatal */ }
-    finally { setLoadingMore(false) }
+    setLoadMoreMsg(null)
+    try {
+      const res = await loadMoreSpotify(token, guildId)
+      onRefresh()
+      if (res.added > 0) {
+        setLoadMoreMsg(`+${res.added} songs added`)
+      } else {
+        setLoadMoreMsg(res.message ?? 'No more songs found')
+      }
+      setTimeout(() => setLoadMoreMsg(null), 4000)
+    } catch {
+      setLoadMoreMsg('Failed — try again')
+      setTimeout(() => setLoadMoreMsg(null), 3000)
+    } finally {
+      setLoadingMore(false)
+    }
   }
 
   return (
@@ -300,16 +314,23 @@ export default function QueueCard({
 
         {/* Load More from Spotify — fetch the next batch beyond what was initially loaded */}
         {spotifyHasMore && (
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
-            style={{ background: 'rgba(29,185,84,0.15)', color: '#1db954', border: '1px solid rgba(29,185,84,0.35)' }}
-            title="Fetch the next 200 songs from this Spotify playlist"
-          >
-            <ListPlus size={12} />
-            {loadingMore ? 'Loading…' : 'Load More from Spotify'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+              style={{ background: 'rgba(29,185,84,0.15)', color: '#1db954', border: '1px solid rgba(29,185,84,0.35)' }}
+              title="Fetch the next 200 songs from this Spotify playlist"
+            >
+              <ListPlus size={12} />
+              {loadingMore ? 'Loading…' : 'More Spotify'}
+            </button>
+            {loadMoreMsg && (
+              <span className="text-[10px] animate-fade-up" style={{ color: loadMoreMsg.startsWith('+') ? '#1db954' : '#888' }}>
+                {loadMoreMsg}
+              </span>
+            )}
+          </div>
         )}
 
         <button
