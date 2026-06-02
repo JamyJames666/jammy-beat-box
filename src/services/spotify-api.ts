@@ -100,10 +100,6 @@ export default class {
   }
 
   private async getPlaylistViaEmbed(playlistId: string, originalUrl: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
-    // Fetch Spotify's embed page directly with a browser User-Agent.
-    // The page embeds all track data as __NEXT_DATA__ JSON — no auth required.
-    // spotify-url-info did the same thing but stopped working because it
-    // didn't send a User-Agent header, causing Spotify to return a different page.
     interface EmbedTrack {
       uri?: string;
       title?: string;
@@ -117,10 +113,10 @@ export default class {
       trackList?: EmbedTrack[];
     }
 
+    const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
     const html = await got(`https://open.spotify.com/embed/playlist/${playlistId}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      },
+      headers: {'User-Agent': BROWSER_UA},
       timeout: {request: 15_000},
     }).text();
 
@@ -138,13 +134,7 @@ export default class {
       throw new Error('No playable tracks found in this Spotify playlist. It may be private or empty.');
     }
 
-    // The embed gives the first ~100 tracks AND an anonymous access token
-    // that can call the real Spotify API for the full paginated list.
-    // Extract that token from __NEXT_DATA__ and use it with got directly.
-    const tokenMatch = /"accessToken":"([^"]+)"/.exec(match[1]);
-    const embedToken = tokenMatch?.[1] ?? null;
-
-    // Start with embed tracks as the baseline (~100, no thumbnails)
+    // Baseline: embed trackList (~100 tracks, no thumbnails)
     let tracks: SpotifyTrack[] = entity.trackList.map(t => ({
       name: t.title ?? '',
       artist: t.subtitle ?? '',
@@ -152,22 +142,62 @@ export default class {
       thumbnailUrl: null,
     }));
 
-    // The __NEXT_DATA__ includes an anonymous access token Spotify's embed
-    // player uses to paginate tracks. Use it to fetch the full list via the
-    // official API — gets thumbnails and bypasses the ~100-track embed cap.
+    // Try several token sources in order of reliability.
+    // Any valid token lets us call the real Spotify API for the full list.
+    const embedToken: string | null =
+      // 1. Various JSON paths Spotify has used across embed versions
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (pageData?.props?.pageProps?.accessToken as string | undefined) ??
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (pageData?.props?.pageProps?.state?.session?.accessToken as string | undefined) ??
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (pageData?.props?.pageProps?.state?.data?.accessToken as string | undefined) ??
+      // 2. Regex over the full __NEXT_DATA__ JSON string
+      (/"accessToken":"([^"]+)"/.exec(match[1])?.[1]) ??
+      // 3. Regex over the entire HTML (token sometimes lives outside __NEXT_DATA__)
+      (/"accessToken":"([^"]+)"/.exec(html)?.[1]) ??
+      null;
+
     if (embedToken) {
       const paginated = await this.paginateWithEmbedToken(embedToken, playlistId, playlistLimit);
-      if (paginated.length > 0) {
+      if (paginated.length > tracks.length) {
         tracks = paginated;
       }
     }
 
+    // If still only have embed tracks, try the anonymous Spotify web-player token
+    // endpoint — returns a short-lived public token, no credentials needed.
+    if (tracks.length <= entity.trackList.length) {
+      const anonToken = await this.getAnonymousToken(BROWSER_UA);
+      if (anonToken) {
+        const paginated = await this.paginateWithEmbedToken(anonToken, playlistId, playlistLimit);
+        if (paginated.length > tracks.length) {
+          tracks = paginated;
+        }
+      }
+    }
+
     const playlist = {
-      title: entity.name ?? entity.title ?? 'Spotify Playlist',
+      title: entity?.name ?? entity?.title ?? 'Spotify Playlist',
       source: originalUrl,
     };
 
     return [this.limitTracks(tracks, playlistLimit), playlist];
+  }
+
+  private async getAnonymousToken(userAgent: string): Promise<string | null> {
+    try {
+      const raw = await got(
+        'https://open.spotify.com/get_access_token?reason=transport&productType=web_player',
+        {
+          headers: {'User-Agent': userAgent, 'Accept': 'application/json'},
+          timeout: {request: 8_000},
+        },
+      ).text();
+      return (JSON.parse(raw) as {accessToken?: string}).accessToken ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async paginateWithEmbedToken(token: string, playlistId: string, limit: number): Promise<SpotifyTrack[]> {
