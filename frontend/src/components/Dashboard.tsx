@@ -106,7 +106,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
     <div className="min-h-screen bg-app-bg">
       {/* ── Header ── */}
       <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-4"
-        style={{ background: 'linear-gradient(90deg,#0f0820,#120d28,#0f0820)', borderBottom: '1px solid #3d2080' }}>
+        style={{ background: 'linear-gradient(90deg,#0f0508,#160b0e,#0f0508)', borderBottom: '1px solid #5c1e30' }}>
         <div className="max-w-7xl mx-auto flex items-center gap-4">
           <div className="flex items-center gap-2.5 mr-auto">
             <div className="w-8 h-8 rounded-xl bg-app-accent/20 flex items-center justify-center">

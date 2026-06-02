@@ -505,7 +505,10 @@ export default class {
     return this.pendingSongs.slice(0, n).map(p => p.song);
   }
 
-  // Pull up to `count` songs from pending into the active queue
+  flushPending(count = 100): void {
+    this.refillFromPending(count);
+  }
+
   clear(): void {
     const newQueue = [];
 

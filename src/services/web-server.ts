@@ -463,6 +463,16 @@ export default class WebServer {
       }
     });
 
+    this.app.post('/api/guilds/:guildId/queue/flush-pending', auth, (req: express.Request, res: express.Response) => {
+      const {count} = req.body as {count?: number};
+      try {
+        this.playerManager.get(req.params.guildId).flushPending(typeof count === 'number' ? count : 100);
+        res.json({ok: true});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
     // Replace a queued song's URL with an alternative version search
     // (e.g. "radio edit", "lyric video"). Suffix is appended to "title artist".
     this.app.post('/api/guilds/:guildId/queue/variant', auth, (req: express.Request, res: express.Response) => {

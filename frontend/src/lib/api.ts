@@ -123,3 +123,5 @@ export const toggleLoopSong  = (t: string, guildId: string) =>
   req('POST', `/api/guilds/${guildId}/loop-song`,  t)
 export const toggleLoopQueue = (t: string, guildId: string) =>
   req('POST', `/api/guilds/${guildId}/loop-queue`, t)
+export const flushPending    = (t: string, guildId: string, count = 100) =>
+  req<{ok: boolean}>('POST', `/api/guilds/${guildId}/queue/flush-pending`, t, {count})

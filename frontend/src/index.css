@@ -13,7 +13,6 @@
     min-height: 100vh;
   }
 
-  /* Light mode: invert the whole page, then re-invert images so they stay natural */
   html.light body {
     filter: invert(1) hue-rotate(180deg);
   }
@@ -22,7 +21,6 @@
     filter: invert(1) hue-rotate(180deg);
   }
 
-  /* Scrollbar */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { @apply bg-app-border rounded-full; }
@@ -30,7 +28,6 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
-  /* Range input (volume slider — used where Radix is overkill) */
   input[type='range'] {
     -webkit-appearance: none;
     @apply bg-transparent w-full cursor-pointer;
@@ -50,15 +47,14 @@
 
 @layer components {
   .card {
-    background: linear-gradient(160deg, #161628 0%, #111120 100%);
-    border: 1px solid #26263d;
+    background: linear-gradient(160deg, #200e14 0%, #160b0e 100%);
+    border: 1px solid #3d1726;
     border-radius: 1rem;
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
   }
 
-  /* Colourful section header */
   .card h2 {
-    background: linear-gradient(90deg, #a855f7, #6366f1);
+    background: linear-gradient(90deg, #f97316, #f43f5e);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -70,8 +66,11 @@
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn bg-app-accent text-white px-4 py-2 hover:bg-app-accent-dark
-           active:scale-95;
+    @apply btn text-white px-4 py-2 active:scale-95;
+    background: linear-gradient(135deg, #f97316, #f43f5e);
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #ea6b0f, #e11d48);
   }
   .btn-secondary {
     @apply btn bg-app-panel text-app-text px-4 py-2 border border-app-border
@@ -106,7 +105,6 @@
            px-1.5 py-0.5 rounded bg-app-spotify text-white leading-none;
   }
 
-  /* Skeleton shimmer */
   .skeleton {
     @apply bg-app-panel animate-shimmer rounded;
     background: linear-gradient(
