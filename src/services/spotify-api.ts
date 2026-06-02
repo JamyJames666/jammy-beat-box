@@ -75,87 +75,28 @@ export default class {
     return this.getPlaylistViaEmbed(uri.id, url, playlistLimit);
   }
 
-  // Fetch a batch of tracks starting at `startOffset` — used by "Load More"
-  // Fetch tracks in batchSize-song chunks. Each individual 50-song page
-  // gets its OWN fresh embed token so we never reuse a rate-limited token.
+  // Public: fetch up to batchSize tracks starting at startOffset.
+  // Each 50-song page gets its own fresh embed token.
   async getPlaylistFrom(url: string, startOffset: number, batchSize: number): Promise<SpotifyTrack[]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
-    const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
     const PAGE = 50;
     const tracks: SpotifyTrack[] = [];
     const pages = Math.ceil(batchSize / PAGE);
 
     for (let i = 0; i < pages; i++) {
       const offset = startOffset + (i * PAGE);
-
-      // Get a FRESH embed token for every single page request.
-      // Each embed page fetch gets its own token allocation — reusing the
-      // same token across multiple API calls is what causes rate limits.
-      let token: string | null = null;
-      for (let attempt = 0; attempt < 3 && !token; attempt++) {
-        try {
-          if (attempt > 0) {
-            // eslint-disable-next-line no-await-in-loop
-            await new Promise<void>(resolve => {
-              setTimeout(resolve, 2000);
-            });
-          }
-
-          // eslint-disable-next-line no-await-in-loop
-          const html = await got(`https://open.spotify.com/embed/playlist/${uri.id}`, {
-            headers: {'User-Agent': BROWSER_UA},
-            timeout: {request: 12_000},
-          }).text();
-          const match = /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/.exec(html);
-          token = match ? (/"accessToken":"([^"]+)"/.exec(match[1])?.[1] ?? null) : null;
-
-          if (!token) {
-            // eslint-disable-next-line no-await-in-loop
-            token = await this.getAnonymousToken(BROWSER_UA);
-          }
-        } catch { /* retry */ }
-      }
-
-      if (!token) {
+      // eslint-disable-next-line no-await-in-loop
+      const {tracks: page, hasMore} = await this.fetchTracksPage(uri.id, offset);
+      tracks.push(...page);
+      if (!hasMore) {
         break;
       }
 
-      // Single 50-song API call with this token
-      try {
-        interface PageItem {
-          track: {name: string; type: string; duration_ms: number; artists: Array<{name: string}>; album: {images: Array<{url: string}>}} | null;
-        }
-
-        // eslint-disable-next-line no-await-in-loop
-        const raw = await got(
-          `https://api.spotify.com/v1/playlists/${uri.id}/tracks?limit=${PAGE}&offset=${offset}`,
-          {headers: {Authorization: `Bearer ${token}`}, timeout: {request: 10_000}},
-        ).text();
-        const body = JSON.parse(raw) as {items: PageItem[]; next: string | null; total: number};
-
-        for (const item of body.items) {
-          if (item.track && item.track.type === 'track') {
-            tracks.push({
-              name: item.track.name,
-              artist: item.track.artists[0]?.name ?? '',
-              durationSeconds: Math.round((item.track.duration_ms ?? 0) / 1000),
-              thumbnailUrl: item.track.album?.images?.[0]?.url ?? null,
-            });
-          }
-        }
-
-        if (!body.next || body.items.length < PAGE) {
-          break;
-        }
-      } catch {
-        break;
-      }
-
-      // Brief pause between pages so we don't look like a bot flood
+      // Brief pause between pages
       if (i < pages - 1) {
         // eslint-disable-next-line no-await-in-loop
         await new Promise<void>(resolve => {
-          setTimeout(resolve, 500);
+          setTimeout(resolve, 600);
         });
       }
     }
@@ -177,6 +118,85 @@ export default class {
     return this.limitTracks(body.tracks, playlistLimit).map(t =>
       this.toSpotifyTrack(t, (t).album?.images?.[0]?.url ?? null),
     );
+  }
+
+  private async freshEmbedToken(playlistId: string): Promise<string | null> {
+    const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>(resolve => {
+            setTimeout(resolve, 2000);
+          });
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        const html = await got(`https://open.spotify.com/embed/playlist/${playlistId}`, {
+          headers: {'User-Agent': BROWSER_UA},
+          timeout: {request: 12_000},
+        }).text();
+        const match = /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/.exec(html);
+        const token = match ? (/"accessToken":"([^"]+)"/.exec(match[1])?.[1] ?? null) : null;
+        if (token) {
+          return token;
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        const anonToken = await this.getAnonymousToken(BROWSER_UA);
+        if (anonToken) {
+          return anonToken;
+        }
+      } catch { /* retry */ }
+    }
+
+    return null;
+  }
+
+  // Fetch a page of 50 tracks at a given offset.
+  // On 429, waits 5 s, gets a fresh token, retries once.
+  private async fetchTracksPage(playlistId: string, offset: number): Promise<{tracks: SpotifyTrack[]; hasMore: boolean}> {
+    interface PageItem {
+      track: {name: string; type: string; duration_ms: number; artists: Array<{name: string}>; album: {images: Array<{url: string}>}} | null;
+    }
+
+    let token = await this.freshEmbedToken(playlistId);
+    if (!token) {
+      return {tracks: [], hasMore: false};
+    }
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await got( // eslint-disable-line no-await-in-loop
+          `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=${offset}`,
+          {headers: {Authorization: `Bearer ${token}`}, timeout: {request: 10_000}, retry: {limit: 0}},
+        );
+        const body = JSON.parse(res.body) as {items: PageItem[]; next: string | null; total: number};
+        const tracks: SpotifyTrack[] = body.items
+          .filter(i => i.track && i.track.type === 'track')
+          .map(i => ({
+            name: i.track!.name,
+            artist: i.track!.artists[0]?.name ?? '',
+            durationSeconds: Math.round((i.track!.duration_ms ?? 0) / 1000),
+            thumbnailUrl: i.track!.album?.images?.[0]?.url ?? null,
+          }));
+        return {tracks, hasMore: Boolean(body.next) && body.items.length === 50};
+      } catch (err: unknown) {
+        const is429 = (err as {response?: {statusCode?: number}}).response?.statusCode === 429;
+        if (is429 && attempt === 0) {
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise<void>(resolve => {
+            setTimeout(resolve, 5000);
+          });
+          // eslint-disable-next-line no-await-in-loop
+          token = await this.freshEmbedToken(playlistId) ?? token;
+        } else {
+          return {tracks: [], hasMore: false};
+        }
+      }
+    }
+
+    return {tracks: [], hasMore: false};
   }
 
   private async getPlaylistViaEmbed(playlistId: string, originalUrl: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
