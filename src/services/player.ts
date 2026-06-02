@@ -97,6 +97,7 @@ export default class {
   private eq = {bass: 0, mid: 0, treble: 0};
   private crossfade = 0;
   private consecutivePlayErrors = 0;
+  private thumbnailFetchInProgress = false;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
@@ -677,18 +678,19 @@ export default class {
   // public search API (no auth required).  Queue items are live references —
   // thumbnailUrl mutations appear in the status API on the next 2-second poll.
   prefetchThumbnails(): void {
+    // Skip if a fetch is already running — prevents parallel Deezer floods
+    // when the frontend calls refresh-thumbnails every few seconds.
+    if (this.thumbnailFetchInProgress) {
+      return;
+    }
+
     const noThumb = (s: SongMetadata) => !s.thumbnailUrl;
 
-    const active = this.queue
-      .filter(noThumb)
-      .slice(0, 40);
+    const targets: SongMetadata[] = [
+      ...this.queue.filter(noThumb),
+      ...this.pendingSongs.map(p => p.song).filter(noThumb),
+    ];
 
-    const pending = this.pendingSongs
-      .map(p => p.song)
-      .filter(noThumb)
-      .slice(0, 20);
-
-    const targets: SongMetadata[] = [...active, ...pending];
     if (targets.length === 0) {
       return;
     }
@@ -734,12 +736,23 @@ export default class {
         });
       });
 
-    // 10 concurrent — well within Deezer's 50 req/5s rate limit
+    // Deezer allows 50 req / 5 s — fire 50 at a time with a 5 s gap.
+    this.thumbnailFetchInProgress = true;
     void (async () => {
-      const BATCH = 10;
-      for (let i = 0; i < targets.length; i += BATCH) {
-        // eslint-disable-next-line no-await-in-loop
-        await Promise.allSettled(targets.slice(i, i + BATCH).map(deezerLookup));
+      try {
+        const BATCH = 50;
+        for (let i = 0; i < targets.length; i += BATCH) {
+          // eslint-disable-next-line no-await-in-loop
+          await Promise.allSettled(targets.slice(i, i + BATCH).map(deezerLookup));
+          if (i + BATCH < targets.length) {
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise<void>(resolve => {
+              setTimeout(resolve, 5000);
+            });
+          }
+        }
+      } finally {
+        this.thumbnailFetchInProgress = false;
       }
     })();
   }
