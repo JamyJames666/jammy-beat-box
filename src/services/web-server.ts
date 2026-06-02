@@ -300,9 +300,20 @@ export default class WebServer {
           }
         }
 
-        // All fetched songs go straight into the active queue — no pending split.
-        // The Spotify layer caps at 500; the queue UI handles large lists fine.
-        songs.forEach(song => {
+        // First 200 go into the active queue immediately.
+        // Songs 201+ go into pendingSongs so "Load Lazy Songs" can flush them
+        // into the queue on demand without overwhelming the bot at startup.
+        const ACTIVE_LIMIT = 200;
+        const activeSongs = songs.slice(0, ACTIVE_LIMIT);
+        const pendingSongs = songs.slice(ACTIVE_LIMIT).map(s => ({
+          song: s,
+          channelId: targetChannelId,
+          requestedBy: 'web-dashboard',
+        }));
+
+        player.setPendingSongs(pendingSongs);
+
+        activeSongs.forEach(song => {
           player.add({
             ...song,
             addedInChannelId: targetChannelId,
