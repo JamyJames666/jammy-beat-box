@@ -33,6 +33,7 @@ const CONFIG_MAP = {
   WEB_PASSWORD: process.env.WEB_PASSWORD ?? '',
   WEB_PORT: parseInt(process.env.WEB_PORT ?? '4000', 10),
   WEB_ONLY_MODE: process.env.WEB_ONLY_MODE === 'true',
+  DISABLE_WEB_ANNOUNCEMENTS: process.env.DISABLE_WEB_ANNOUNCEMENTS === 'true',
 } as const;
 
 const BOT_ACTIVITY_TYPE_MAP = {
@@ -63,6 +64,7 @@ export default class Config {
   readonly WEB_PASSWORD!: string;
   readonly WEB_PORT!: number;
   readonly WEB_ONLY_MODE!: boolean;
+  readonly DISABLE_WEB_ANNOUNCEMENTS!: boolean;
 
   constructor() {
     for (const [key, value] of Object.entries(CONFIG_MAP)) {

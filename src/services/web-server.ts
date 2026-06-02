@@ -127,6 +127,7 @@ export default class WebServer {
   private readonly app = express();
   private readonly password: string;
   private readonly port: number;
+  private readonly config: Config;
   private readonly playerManager: PlayerManager;
   private readonly client: Client;
   private readonly getSongs: GetSongs;
@@ -137,6 +138,7 @@ export default class WebServer {
     @inject(TYPES.Client) client: Client,
     @inject(TYPES.Services.GetSongs) getSongs: GetSongs,
   ) {
+    this.config = config;
     this.password = config.WEB_PASSWORD;
     this.port = config.WEB_PORT;
     this.playerManager = playerManager;
@@ -321,10 +323,13 @@ export default class WebServer {
         player.prefetchThumbnails();
 
         // Announce to Discord that the web dashboard added songs
-        const announceCh = await findAnnouncementChannel(this.client, req.params.guildId);
-        if (announceCh) {
-          const msg = pickWebMessage(songs.length, songs[0].title);
-          announceCh.send(msg).catch(() => { /* best-effort */ });
+        // (can be disabled with DISABLE_WEB_ANNOUNCEMENTS=true in .env)
+        if (!this.config.DISABLE_WEB_ANNOUNCEMENTS) {
+          const announceCh = await findAnnouncementChannel(this.client, req.params.guildId);
+          if (announceCh) {
+            const msg = pickWebMessage(songs.length, songs[0].title);
+            announceCh.send(msg).catch(() => { /* best-effort */ });
+          }
         }
 
         res.json({ok: true, added: songs.length, first: songs[0].title});
