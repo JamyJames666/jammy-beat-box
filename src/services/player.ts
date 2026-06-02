@@ -718,9 +718,9 @@ export default class {
         req.setTimeout(5000, () => { req.destroy(); resolve(); });
       });
 
-    // Run 4 at a time without importing p-limit
+    // 10 concurrent — well within Deezer's 50 req/5s rate limit
     void (async () => {
-      const BATCH = 4;
+      const BATCH = 10;
       for (let i = 0; i < targets.length; i += BATCH) {
         await Promise.allSettled(targets.slice(i, i + BATCH).map(deezerLookup));
       }
