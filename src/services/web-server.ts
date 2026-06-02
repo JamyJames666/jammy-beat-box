@@ -391,7 +391,18 @@ export default class WebServer {
         loopQueue: player.loopCurrentQueue,
         pendingCount: player.getPendingCount(),
         pendingPreview: player.getPendingPreview(20).map(s => ({title: s.title, artist: s.artist})),
-        spotifyHasMore: player.spotifyPlaylistContext !== null,
+        spotifyHasMore: (() => {
+          // Restore context from queue if it was lost on restart
+          if (!player.spotifyPlaylistContext) {
+            const s = player.getQueue().find(q => q.playlist?.source?.includes('open.spotify.com/playlist'));
+            if (s?.playlist) {
+              const count = player.getQueue().filter(q => q.playlist?.source === s.playlist!.source).length;
+              player.spotifyPlaylistContext = {url: s.playlist.source, loadedCount: count};
+            }
+          }
+
+          return player.spotifyPlaylistContext !== null;
+        })(),
       });
     });
 
