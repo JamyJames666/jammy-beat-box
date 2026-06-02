@@ -4,22 +4,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Design tokens — mirror the CSS custom props in index.css
         app: {
-          bg:            '#0b0608',
-          surface:       '#160b0e',
-          panel:         '#200e14',
-          border:        '#3d1726',
-          accent:        '#f43f5e',
-          'accent-dark': '#e11d48',
-          'accent-2':    '#f97316',
-          text:          '#fff5f7',
-          muted:         '#c07080',
-          danger:        '#ef4444',
+          bg:            '#0d0d0d',
+          surface:       '#141414',
+          panel:         '#1c1c1c',
+          border:        '#272727',
+          accent:        '#a855f7',
+          'accent-dark': '#9333ea',
+          text:          '#ffffff',
+          muted:         '#888888',
+          danger:        '#f43f5e',
           spotify:       '#1db954',
           youtube:       '#ff0000',
         },
-        // DJ Deck v3 tokens
         'deck-a':      '#3b82f6',
         'deck-b':      '#f97316',
         lcd:           '#86efac',
@@ -59,7 +56,7 @@ export default {
       },
       boxShadow: {
         card: '0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.6)',
-        glow: '0 0 20px rgba(244,63,94,0.25)',
+        glow: '0 0 20px rgba(168,85,247,0.25)',
       },
     },
   },

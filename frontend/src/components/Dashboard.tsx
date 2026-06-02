@@ -24,10 +24,8 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [guildId,   setGuildId]   = useState<string>(() => localStorage.getItem('muse_guild') ?? '')
   const [channelId, setChannelId] = useState<string>('')
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
-  // DJ and Auto DJ views exist as components but are not yet exposed in the UI.
   const [_view] = useState<'player' | 'dj' | 'autodj'>('player')
 
-  // Dark / light mode
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     (localStorage.getItem('muse_theme') as 'dark' | 'light') ?? 'dark',
   )
@@ -36,7 +34,6 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
     localStorage.setItem('muse_theme', theme)
   }, [theme])
 
-  // ── Load guilds on mount ────────────────────────────────────────────────────
   useEffect(() => {
     getGuilds(token)
       .then(gs => {
@@ -52,7 +49,6 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       })
   }, [token]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Load channels when guild changes ────────────────────────────────────────
   useEffect(() => {
     if (!guildId) return
     getChannels(token, guildId)
@@ -66,7 +62,6 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       .catch(() => { /* non-fatal */ })
   }, [token, guildId])
 
-  // ── Poll player status every 2 s ────────────────────────────────────────────
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const poll = useCallback(async () => {
@@ -90,7 +85,6 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [poll])
 
-  // ── Guild change ─────────────────────────────────────────────────────────────
   const handleGuildChange = (id: string) => {
     setGuildId(id)
     setStatus(null)
@@ -104,27 +98,26 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
 
   return (
     <div className="min-h-screen bg-app-bg">
-      {/* ── Header ── */}
-      <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-4"
-        style={{ background: 'linear-gradient(90deg,#0f0508,#160b0e,#0f0508)', borderBottom: '1px solid #5c1e30' }}>
-        <div className="max-w-7xl mx-auto flex items-center gap-4">
+      {/* Header */}
+      <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-3.5"
+        style={{ background: 'rgba(13,13,13,0.9)', borderBottom: '1px solid #1f1f1f' }}>
+        <div className="max-w-[1800px] mx-auto flex items-center gap-4">
           <div className="flex items-center gap-2.5 mr-auto">
             <div className="w-8 h-8 rounded-xl bg-app-accent/20 flex items-center justify-center">
               <Music2 size={16} className="text-app-accent" />
             </div>
-            <span className="font-bold text-app-text text-base tracking-tight">Muse</span>
+            <span className="font-bold text-white text-base tracking-tight">Jammy Beat Box</span>
           </div>
 
-          {/* Dark/light toggle */}
           <button
             onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-app-muted hover:text-app-text hover:bg-app-panel transition-colors border border-app-border"
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors border border-app-border"
+            style={{ color: '#888' }}
             title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />}
           </button>
 
-          {/* Guild selector */}
           {guilds.length > 0 && (
             <div className="relative">
               <select
@@ -140,45 +133,49 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
                 ))}
               </select>
               <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2
-                                                 text-app-muted pointer-events-none" />
+                                                 pointer-events-none" style={{ color: '#888' }} />
             </div>
           )}
         </div>
       </header>
 
-      {/* ── Main content ── */}
-      {/* DjDeckV3 and AutoDj components exist but are not yet in the nav */}
+      {/* Main */}
       {_view === 'dj' ? (
         <DjDeckV3 status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : _view === 'autodj' ? (
         <AutoDj status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
-        <main className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
+        <div className="max-w-[1800px] mx-auto flex gap-0" style={{ height: 'calc(100vh - 57px)' }}>
 
-            {/* Left column */}
-            <div className="flex flex-col gap-6">
+          {/* Left column: Now Playing */}
+          <div className="flex-shrink-0 relative overflow-hidden flex flex-col"
+            style={{ width: 440 }}>
+            <div className="relative z-10 flex flex-col gap-4 p-6 h-full">
               <NowPlaying
                 status={status}
                 token={token}
                 guildId={guildId}
                 onRefresh={poll}
               />
-              <AddToQueue
-                token={token}
-                guildId={guildId}
-                channels={channels}
-                channelId={channelId}
-                onChannelChange={handleChannelChange}
-                onRefresh={poll}
-              />
-              <BotSettings
-                token={token}
-                guildId={guildId}
-              />
+              <div className="mt-auto flex flex-col gap-3">
+                <AddToQueue
+                  token={token}
+                  guildId={guildId}
+                  channels={channels}
+                  channelId={channelId}
+                  onChannelChange={handleChannelChange}
+                  onRefresh={poll}
+                />
+                <BotSettings token={token} guildId={guildId} />
+              </div>
             </div>
+          </div>
 
-            {/* Right column — queue */}
+          {/* Divider */}
+          <div className="flex-shrink-0" style={{ width: 1, background: '#1f1f1f' }} />
+
+          {/* Right column: Queue */}
+          <div className="flex-1 overflow-hidden flex flex-col p-6">
             <QueueCard
               queue={status?.queue ?? []}
               token={token}
@@ -187,9 +184,9 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
               pendingCount={status?.pendingCount ?? 0}
               pendingPreview={status?.pendingPreview ?? []}
             />
-
           </div>
-        </main>
+
+        </div>
       )}
     </div>
   )

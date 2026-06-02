@@ -21,10 +21,10 @@
     filter: invert(1) hue-rotate(180deg);
   }
 
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-app-border rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-app-muted; }
+  ::-webkit-scrollbar-thumb { background: #333; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #555; }
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
@@ -47,17 +47,14 @@
 
 @layer components {
   .card {
-    background: linear-gradient(160deg, #200e14 0%, #160b0e 100%);
-    border: 1px solid #3d1726;
+    background: #141414;
+    border: 1px solid #272727;
     border-radius: 1rem;
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
   }
 
   .card h2 {
-    background: linear-gradient(90deg, #f97316, #f43f5e);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: #ffffff;
   }
 
   .btn {
@@ -66,11 +63,7 @@
            disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-primary {
-    @apply btn text-white px-4 py-2 active:scale-95;
-    background: linear-gradient(135deg, #f97316, #f43f5e);
-  }
-  .btn-primary:hover {
-    background: linear-gradient(135deg, #ea6b0f, #e11d48);
+    @apply btn bg-app-accent text-white px-4 py-2 hover:bg-app-accent-dark active:scale-95;
   }
   .btn-secondary {
     @apply btn bg-app-panel text-app-text px-4 py-2 border border-app-border
