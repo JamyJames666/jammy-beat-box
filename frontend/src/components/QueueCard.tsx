@@ -273,8 +273,10 @@ export default function QueueCard({
         <button
           onClick={handleBringToQueue}
           disabled={bringingToQueue || pendingCount === 0}
-          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg
-                     transition-all active:scale-95"
+          className={cn(
+            'flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95',
+            pendingCount > 0 && !bringingToQueue && 'animate-lazy-ready',
+          )}
           style={pendingCount > 0
             ? { background: 'rgba(168,85,247,0.20)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.40)' }
             : { background: 'transparent', color: '#444', border: '1px solid #333', cursor: 'default' }
