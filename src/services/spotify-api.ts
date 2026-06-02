@@ -36,24 +36,27 @@ export default class {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
 
     // ── Attempt 1: client credentials token → direct HTTP pagination ───────
-    // Using got directly instead of spotify-web-api-node's wrapper avoids
-    // the library swallowing pagination errors and stopping early.
-    const clientToken = this.spotify.getAccessToken();
-    if (clientToken) {
-      try {
-        const metaRaw = await got(
-          `https://api.spotify.com/v1/playlists/${uri.id}?fields=name,href`,
-          {headers: {Authorization: `Bearer ${clientToken}`}, timeout: {request: 10_000}},
-        ).text();
-        const meta = JSON.parse(metaRaw) as {name?: string; href?: string};
-
-        const tracks = await this.paginateWithEmbedToken(clientToken, uri.id, playlistLimit);
-        if (tracks.length > 0) {
-          return [tracks, {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? url}];
-        }
-      } catch {
-        // fall through to embed scrape
+    // Use cached token; if missing (background refresh failed at startup), grant fresh.
+    try {
+      let clientToken = this.spotify.getAccessToken();
+      if (!clientToken) {
+        const auth = await this.spotify.clientCredentialsGrant();
+        clientToken = auth.body.access_token;
+        this.spotify.setAccessToken(clientToken);
       }
+
+      const metaRaw = await got(
+        `https://api.spotify.com/v1/playlists/${uri.id}?fields=name,href`,
+        {headers: {Authorization: `Bearer ${clientToken}`}, timeout: {request: 10_000}},
+      ).text();
+      const meta = JSON.parse(metaRaw) as {name?: string; href?: string};
+
+      const tracks = await this.paginateWithEmbedToken(clientToken, uri.id, playlistLimit);
+      if (tracks.length > 0) {
+        return [tracks, {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? url}];
+      }
+    } catch {
+      // credentials invalid or network error → fall through to embed scrape
     }
 
     // ── Attempt 2: scrape Spotify embed page directly (no auth required) ──
