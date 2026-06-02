@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronDown, Sun, Moon } from 'lucide-react'
 import {
-  getGuilds, getChannels, getStatus, refreshThumbnails,
+  getGuilds, getChannels, getStatus,
   ApiError,
   type Guild, type Channel, type PlayerStatus,
 } from '@/lib/api'
@@ -45,19 +45,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
   const [_view] = useState<'player' | 'dj' | 'autodj'>('player')
 
-  // Auto-refresh Deezer thumbnails every 4 s while any queue song is missing one.
-  // Stops automatically once all thumbnails are loaded.
-  const thumbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current)
-    const queue = status?.queue ?? []
-    const missing = queue.filter(s => !s.thumbnailUrl).length
-    if (missing === 0 || !guildId) return
-    thumbTimerRef.current = setTimeout(async () => {
-      await refreshThumbnails(token, guildId).catch(() => null)
-    }, 4000)
-    return () => { if (thumbTimerRef.current) clearTimeout(thumbTimerRef.current) }
-  }, [status?.queue]) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     (localStorage.getItem('muse_theme') as 'dark' | 'light') ?? 'dark',

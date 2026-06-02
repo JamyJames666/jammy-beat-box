@@ -312,25 +312,18 @@ export default function QueueCard({
           {bringingToQueue ? 'Loading…' : pendingCount > 0 ? `Load Lazy Songs (${pendingCount})` : 'Load Lazy Songs'}
         </button>
 
-        {/* Load More from Spotify — fetch the next batch beyond what was initially loaded */}
+        {/* Load More from Spotify */}
         {spotifyHasMore && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleLoadMore}
-              disabled={loadingMore}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
-              style={{ background: 'rgba(29,185,84,0.15)', color: '#1db954', border: '1px solid rgba(29,185,84,0.35)' }}
-              title="Fetch the next 200 songs from this Spotify playlist"
-            >
-              <ListPlus size={12} />
-              {loadingMore ? 'Loading…' : 'More Spotify'}
-            </button>
-            {loadMoreMsg && (
-              <span className="text-[10px] animate-fade-up" style={{ color: loadMoreMsg.startsWith('+') ? '#1db954' : '#888' }}>
-                {loadMoreMsg}
-              </span>
-            )}
-          </div>
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+            style={{ background: 'rgba(29,185,84,0.15)', color: '#1db954', border: '1px solid rgba(29,185,84,0.35)' }}
+            title="Fetch the next 200 songs from this Spotify playlist"
+          >
+            <ListPlus size={12} />
+            {loadingMore ? 'Loading…' : 'More Spotify'}
+          </button>
         )}
 
         <button
@@ -361,6 +354,14 @@ export default function QueueCard({
           <Trash2 size={12} /> Clear
         </button>
       </div>
+
+      {/* Load More result message — shown below the header for visibility */}
+      {loadMoreMsg && (
+        <div className="px-5 py-1.5 flex-shrink-0 text-xs font-medium animate-fade-up"
+          style={{ color: loadMoreMsg.startsWith('+') ? '#1db954' : '#888', borderBottom: '1px solid #1a1a2a' }}>
+          {loadMoreMsg}
+        </div>
+      )}
 
       {/* Search */}
       {displayQueue.length > 0 && (
