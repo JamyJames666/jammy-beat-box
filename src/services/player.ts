@@ -790,12 +790,8 @@ export default class {
         }
 
         song.url = result.id;
-        // Use the YouTube thumbnail when the song has no Spotify thumbnail.
-        // song is a live reference to the queue item, so this updates the
-        // status API response on the next poll.
-        if (!song.thumbnailUrl && result.thumbnail) {
-          song.thumbnailUrl = result.thumbnail;
-        }
+        // YouTube thumbnails disabled — Deezer provides higher-quality
+        // album art via prefetchThumbnails and doesn't show video screenshots.
       }
 
       const MAX_CACHE_LENGTH_SECONDS = 30 * 60; // 30 minutes

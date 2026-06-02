@@ -423,7 +423,10 @@ export default class WebServer {
 
     this.app.post('/api/guilds/:guildId/queue/shuffle', auth, (req: express.Request, res: express.Response) => {
       try {
-        this.playerManager.get(req.params.guildId).shuffleQueue();
+        const player = this.playerManager.get(req.params.guildId);
+        player.shuffleQueue();
+        // Fetch Deezer thumbnails for any songs that just shuffled into view
+        player.prefetchThumbnails();
         res.json({ok: true});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
@@ -473,7 +476,10 @@ export default class WebServer {
     this.app.post('/api/guilds/:guildId/queue/flush-pending', auth, (req: express.Request, res: express.Response) => {
       const {count} = req.body as {count?: number};
       try {
-        this.playerManager.get(req.params.guildId).flushPending(typeof count === 'number' ? count : 100);
+        const player = this.playerManager.get(req.params.guildId);
+        player.flushPending(typeof count === 'number' ? count : 100);
+        // Fetch Deezer thumbnails for the newly loaded songs
+        player.prefetchThumbnails();
         res.json({ok: true});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});

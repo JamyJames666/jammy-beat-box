@@ -177,7 +177,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
               }} />
             <div className="relative z-10 flex flex-col gap-4 p-6 h-full overflow-y-auto">
               <NowPlaying status={status} token={token} guildId={guildId} onRefresh={poll} />
-              <div className="mt-auto flex flex-col gap-3 pt-4">
+              <div className="flex flex-col gap-3 pt-2">
                 <AddToQueue
                   token={token}
                   guildId={guildId}
