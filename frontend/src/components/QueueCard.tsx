@@ -176,11 +176,10 @@ interface Props {
   guildId: string
   onRefresh: () => void
   pendingCount?: number
-  pendingPreview?: Array<{ title: string; artist: string }>
 }
 
 export default function QueueCard({
-  queue, token, guildId, onRefresh, pendingCount = 0, pendingPreview = [],
+  queue, token, guildId, onRefresh, pendingCount = 0,
 }: Props) {
   const [optimisticQueue, setOptimisticQueue] = useState<TrackInfo[] | null>(null)
   const [search, setSearch]                   = useState('')
@@ -262,27 +261,29 @@ export default function QueueCard({
         <ListMusic size={14} className="flex-shrink-0 text-app-accent" />
         <h2 className="text-sm font-semibold">Up Next</h2>
 
-        {/* Song count + pending badge */}
-        <div className="flex items-center gap-2 mr-auto">
-          {displayQueue.length > 0 && (
-            <span className="text-xs tabular-nums" style={{ color: '#666' }}>
-              {displayQueue.length} songs
-            </span>
-          )}
-          {pendingCount > 0 && (
-            <button
-              onClick={handleBringToQueue}
-              disabled={bringingToQueue}
-              className="flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full
-                         transition-all disabled:opacity-60 active:scale-95"
-              style={{ background: 'rgba(168,85,247,0.18)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.35)' }}
-              title="Click to load more songs into queue"
-            >
-              <ListPlus size={11} />
-              {bringingToQueue ? 'Loading…' : `+${pendingCount} more — click to load`}
-            </button>
-          )}
-        </div>
+        {/* Song count */}
+        {displayQueue.length > 0 && (
+          <span className="text-xs tabular-nums mr-auto" style={{ color: '#666' }}>
+            {displayQueue.length} songs
+          </span>
+        )}
+        {displayQueue.length === 0 && <span className="mr-auto" />}
+
+        {/* Load Lazy Songs — always visible */}
+        <button
+          onClick={handleBringToQueue}
+          disabled={bringingToQueue || pendingCount === 0}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg
+                     transition-all active:scale-95"
+          style={pendingCount > 0
+            ? { background: 'rgba(168,85,247,0.20)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.40)' }
+            : { background: 'transparent', color: '#444', border: '1px solid #333', cursor: 'default' }
+          }
+          title={pendingCount > 0 ? `Load ${pendingCount} more songs into queue` : 'No lazy songs waiting'}
+        >
+          <ListPlus size={12} />
+          {bringingToQueue ? 'Loading…' : pendingCount > 0 ? `Load Lazy Songs (${pendingCount})` : 'Load Lazy Songs'}
+        </button>
 
         <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"
@@ -379,40 +380,6 @@ export default function QueueCard({
         </div>
       )}
 
-      {/* Pending — always pinned at bottom */}
-      {pendingCount > 0 && (
-        <div className="flex-shrink-0 border-t border-app-border/60 px-5 py-3 bg-app-surface">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium" style={{ color: '#888' }}>
-              {pendingCount} more song{pendingCount !== 1 ? 's' : ''} — loads as queue plays
-            </p>
-            <button
-              onClick={handleBringToQueue}
-              disabled={bringingToQueue}
-              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide
-                         px-3 py-1.5 rounded-lg transition-all disabled:opacity-50 bg-app-accent hover:bg-app-accent-dark text-white"
-            >
-              <ListPlus size={11} />
-              {bringingToQueue ? 'Loading…' : 'Bring to Queue'}
-            </button>
-          </div>
-          <div className="space-y-1 max-h-28 overflow-y-auto">
-            {pendingPreview.map((s, i) => (
-              <div key={i} className="flex items-center gap-2 opacity-50">
-                <Music size={9} style={{ color: '#555' }} className="flex-shrink-0" />
-                <p className="text-xs truncate" style={{ color: '#888' }}>
-                  {s.title}{s.artist ? <span style={{ color: '#555' }}> · {s.artist}</span> : null}
-                </p>
-              </div>
-            ))}
-            {pendingCount > pendingPreview.length && (
-              <p className="text-xs" style={{ color: '#555' }}>
-                +{pendingCount - pendingPreview.length} more…
-              </p>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
