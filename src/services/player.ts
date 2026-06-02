@@ -678,14 +678,23 @@ export default class {
   // Queue items are live references — thumbnailUrl updates are visible to the
   // status API on the next poll without any extra endpoints.
   prefetchThumbnails(): void {
-    // Cap at 50 so large playlists don't hammer YouTube all at once.
-    // Remaining thumbnails resolve naturally as each song starts playing.
-    const pending = this.queue
-      .filter(s => s.url.startsWith('ytsearch1:') && !s.thumbnailUrl)
-      .slice(0, 50);
-    if (pending.length === 0) {
-      return;
-    }
+    // Resolve YouTube thumbnails for queued songs that have no thumbnail yet.
+    // Also backfill thumbnails for pending songs so they're ready when they enter the active queue.
+    // Cap at 60 total to avoid hammering YouTube.
+    const needsThumb = (url: string, thumb: string | null | undefined) =>
+      url.startsWith('ytsearch1:') && !thumb;
+
+    const activeNeedingThumb = (this.queue as Array<{url: string; thumbnailUrl?: string | null}>)
+      .filter(s => needsThumb(s.url, s.thumbnailUrl))
+      .slice(0, 40);
+
+    const pendingNeedingThumb = this.pendingSongs
+      .map(p => p.song)
+      .filter(s => needsThumb(s.url, s.thumbnailUrl))
+      .slice(0, 20);
+
+    const targets = [...activeNeedingThumb, ...pendingNeedingThumb];
+    if (targets.length === 0) return;
 
     interface YtsrVideo {
       type: string;
@@ -693,7 +702,7 @@ export default class {
       thumbnail?: string;
     }
 
-    const resolveThumbnail = async (song: QueuedSong): Promise<void> => {
+    const resolveThumbnail = async (song: {url: string; thumbnailUrl?: string | null}): Promise<void> => {
       try {
         const query = song.url.slice('ytsearch1:'.length);
         const {default: ytsr} = await import('@distube/ytsr') as {default: (q: string, o: {limit: number}) => Promise<{items: YtsrVideo[]}>};
@@ -709,8 +718,8 @@ export default class {
 
     void (async () => {
       const {default: pLimit} = await import('p-limit');
-      const limit = pLimit(8);
-      await Promise.allSettled(pending.map(async song => limit(async () => resolveThumbnail(song))));
+      const limit = pLimit(6);
+      await Promise.allSettled(targets.map(song => limit(() => resolveThumbnail(song))));
     })();
   }
 

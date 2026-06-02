@@ -119,7 +119,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
     <div className="min-h-screen bg-app-bg">
       {/* Header */}
       <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-3"
-        style={{ background: 'rgba(13,13,13,0.92)', borderBottom: '1px solid #1f1f1f' }}>
+        style={{ background: 'rgba(7,6,15,0.88)', borderBottom: '1px solid #2e2b45' }}>
         <div className="max-w-[1800px] mx-auto flex items-center gap-4">
           <div className="flex items-center gap-2.5 mr-auto">
             <JammyLogo />
@@ -165,13 +165,13 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
         <div className="max-w-[1800px] mx-auto flex" style={{ height: 'calc(100vh - 53px)' }}>
 
           {/* Left: Now Playing */}
-          <div className="flex-shrink-0 relative overflow-hidden flex flex-col" style={{ width: 520 }}>
+          <div className="flex-shrink-0 relative overflow-hidden flex flex-col" style={{ width: 620 }}>
             {/* Ambient glow */}
             <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
               style={{
-                top: 40, width: 360, height: 360,
-                background: 'radial-gradient(circle, rgba(210,130,50,0.28) 0%, rgba(160,80,20,0.1) 50%, transparent 70%)',
-                filter: 'blur(50px)',
+                top: 40, width: 420, height: 420,
+                background: 'radial-gradient(circle, rgba(168,85,247,0.18) 0%, rgba(99,102,241,0.10) 45%, transparent 70%)',
+                filter: 'blur(60px)',
                 borderRadius: '50%',
                 zIndex: 0,
               }} />
@@ -192,7 +192,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
           </div>
 
           {/* Divider */}
-          <div className="flex-shrink-0" style={{ width: 1, background: '#1a1a1a' }} />
+          <div className="flex-shrink-0" style={{ width: 1, background: '#2e2b45' }} />
 
           {/* Right: Queue */}
           <div className="flex-1 overflow-hidden p-6">

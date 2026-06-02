@@ -59,9 +59,9 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
         <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
           style={{
             top: 24,
-            width: 280, height: 280,
-            background: 'radial-gradient(circle, rgba(210,130,50,0.32) 0%, rgba(180,90,20,0.12) 45%, transparent 70%)',
-            filter: 'blur(38px)',
+            width: 360, height: 360,
+            background: 'radial-gradient(circle, rgba(168,85,247,0.30) 0%, rgba(99,102,241,0.14) 45%, transparent 70%)',
+            filter: 'blur(48px)',
             borderRadius: '50%',
             zIndex: 0,
           }} />

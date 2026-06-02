@@ -11,6 +11,12 @@
     @apply bg-app-bg text-app-text antialiased;
     font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 65% 55% at 8% 0%,   rgba(130, 40, 220, 0.22) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 45% at 92% 5%,  rgba(60, 20, 180, 0.14) 0%, transparent 65%),
+      radial-gradient(ellipse 55% 50% at 95% 100%, rgba(0, 160, 170, 0.13) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 5% 95%,  rgba(180, 30, 120, 0.10) 0%, transparent 65%);
+    background-attachment: fixed;
   }
 
   html.light body {
@@ -23,8 +29,8 @@
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #333; border-radius: 999px; }
-  ::-webkit-scrollbar-thumb:hover { background: #555; }
+  ::-webkit-scrollbar-thumb { background: #3a3760; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #5a57a0; }
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
 
@@ -47,14 +53,15 @@
 
 @layer components {
   .card {
-    background: #141414;
-    border: 1px solid #272727;
+    background: rgba(14, 12, 28, 0.82);
+    border: 1px solid #2e2b45;
     border-radius: 1rem;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.04);
+    backdrop-filter: blur(14px);
   }
 
   .card h2 {
-    color: #ffffff;
+    color: #f0eeff;
   }
 
   .btn {
