@@ -92,7 +92,7 @@ export const setAnnouncementChannel = (t: string, guildId: string, channelId: st
   req<{ok: boolean}>('POST', `/api/guilds/${guildId}/settings/announcement`, t, {channelId})
 
 export const play    = (t: string, guildId: string, query: string, channelId?: string) =>
-  req<{ ok: boolean; added: number; first: string }>(
+  req<{ ok: boolean; added: number; queued: number; pending: number; first: string }>(
     'POST', `/api/guilds/${guildId}/play`, t, { query, channelId },
   )
 export const pause   = (t: string, guildId: string) => req('POST', `/api/guilds/${guildId}/pause`,  t)
