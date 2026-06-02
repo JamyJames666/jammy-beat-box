@@ -486,6 +486,19 @@ export default class WebServer {
       }
     });
 
+    // Manually trigger Deezer thumbnail fetching for all songs that still need one.
+    // The frontend calls this periodically until the queue is fully covered.
+    this.app.post('/api/guilds/:guildId/queue/refresh-thumbnails', auth, (req: express.Request, res: express.Response) => {
+      try {
+        const player = this.playerManager.get(req.params.guildId);
+        const missing = player.getQueue().filter(s => !s.thumbnailUrl).length;
+        player.prefetchThumbnails();
+        res.json({ok: true, missing});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
     // Replace a queued song's URL with an alternative version search
     // (e.g. "radio edit", "lyric video"). Suffix is appended to "title artist".
     this.app.post('/api/guilds/:guildId/queue/variant', auth, (req: express.Request, res: express.Response) => {

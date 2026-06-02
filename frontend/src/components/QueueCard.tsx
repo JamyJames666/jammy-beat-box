@@ -17,10 +17,10 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  Shuffle, GripVertical, X, Music, Trash2, ListMusic,
+  Shuffle, GripVertical, X, Music, Trash2, ListMusic, ImageIcon,
   ChevronsUp, Search, ListPlus,
 } from 'lucide-react'
-import { shuffle, clearQueue, move, remove, flushPending, type TrackInfo } from '@/lib/api'
+import { shuffle, clearQueue, move, remove, flushPending, refreshThumbnails, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
@@ -228,8 +228,9 @@ export default function QueueCard({
     }
   }, [displayQueue, token, guildId, onRefresh])
 
-  const handleShuffle    = async () => { await shuffle(token, guildId).catch(() => null); onRefresh() }
-  const handleClearQueue = async () => { await clearQueue(token, guildId).catch(() => null); onRefresh() }
+  const handleShuffle       = async () => { await shuffle(token, guildId).catch(() => null); onRefresh() }
+  const handleClearQueue    = async () => { await clearQueue(token, guildId).catch(() => null); onRefresh() }
+  const handleRefreshThumbs = async () => { await refreshThumbnails(token, guildId).catch(() => null); onRefresh() }
 
   const handleRemove = async (originalIndex: number) => {
     setOptimisticQueue(displayQueue.filter((_, i) => i !== originalIndex))
@@ -298,6 +299,14 @@ export default function QueueCard({
               ({displayQueue.length + pendingCount})
             </span>
           )}
+        </button>
+        <button
+          className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"
+          onClick={handleRefreshThumbs}
+          disabled={displayQueue.length === 0}
+          title="Fetch missing album art from Deezer"
+        >
+          <ImageIcon size={12} />
         </button>
         <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5 hover:text-app-danger"
