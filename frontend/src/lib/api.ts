@@ -26,7 +26,8 @@ export interface PlayerStatus {
   crossfade:  number
   loopSong:      boolean
   loopQueue:     boolean
-  pendingCount:  number
+  pendingCount:      number
+  spotifyHasMore:    boolean
   pendingPreview: Array<{ title: string; artist: string }>
 }
 
@@ -127,3 +128,5 @@ export const flushPending         = (t: string, guildId: string, count = 100) =>
   req<{ok: boolean}>('POST', `/api/guilds/${guildId}/queue/flush-pending`, t, {count})
 export const refreshThumbnails    = (t: string, guildId: string) =>
   req<{ok: boolean; missing: number}>('POST', `/api/guilds/${guildId}/queue/refresh-thumbnails`, t)
+export const loadMoreSpotify      = (t: string, guildId: string) =>
+  req<{ok: boolean; added: number; nextOffset: number; message?: string}>('POST', `/api/guilds/${guildId}/queue/load-more-spotify`, t)

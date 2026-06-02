@@ -82,6 +82,9 @@ export default class {
   public guildId: string;
   public loopCurrentSong = false;
   public loopCurrentQueue = false;
+  // Tracks the last Spotify playlist URL and how many songs were loaded
+  // so "Load More from Spotify" can fetch the next batch at the right offset.
+  public spotifyPlaylistContext: {url: string; loadedCount: number} | null = null;
   private currentChannel: VoiceChannel | undefined;
   private queue: QueuedSong[] = [];
   private queuePosition = 0;

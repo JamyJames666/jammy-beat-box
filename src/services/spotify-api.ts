@@ -75,6 +75,50 @@ export default class {
     return this.getPlaylistViaEmbed(uri.id, url, playlistLimit);
   }
 
+  // Fetch a batch of tracks starting at `startOffset` — used by "Load More"
+  // to page through a playlist beyond the initial load.
+  async getPlaylistFrom(url: string, startOffset: number, batchSize: number): Promise<SpotifyTrack[]> {
+    const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
+    const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+    // Try client credentials first
+    const clientId = this.spotify.getClientId();
+    const clientSecret = this.spotify.getClientSecret();
+    if (clientId && clientSecret) {
+      try {
+        const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+        const tokenRaw = await got('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded'},
+          body: 'grant_type=client_credentials',
+          timeout: {request: 10_000},
+        }).text();
+        const clientToken = (JSON.parse(tokenRaw) as {access_token?: string}).access_token;
+        if (clientToken) {
+          const tracks = await this.paginateWithEmbedToken(clientToken, uri.id, batchSize, startOffset);
+          if (tracks.length > 0) {
+            return tracks;
+          }
+        }
+      } catch { /* fall through */ }
+    }
+
+    // Fall back to embed token
+    const html = await got(`https://open.spotify.com/embed/playlist/${uri.id}`, {
+      headers: {'User-Agent': BROWSER_UA},
+      timeout: {request: 15_000},
+    }).text();
+    const match = /<script id="__NEXT_DATA__"[^>]*>([^<]+)<\/script>/.exec(html);
+    const embedToken = match ? (/"accessToken":"([^"]+)"/.exec(match[1])?.[1] ?? null) : null;
+
+    const token = embedToken ?? await this.getAnonymousToken(BROWSER_UA);
+    if (token) {
+      return this.paginateWithEmbedToken(token, uri.id, batchSize, startOffset);
+    }
+
+    return [];
+  }
+
   async getTrack(url: string): Promise<SpotifyTrack> {
     const uri = spotifyURI.parse(url) as spotifyURI.Track;
     const {body} = await this.spotify.getTrack(uri.id);
@@ -280,7 +324,7 @@ export default class {
     return tracks;
   }
 
-  private async paginateWithEmbedToken(token: string, playlistId: string, limit: number): Promise<SpotifyTrack[]> {
+  private async paginateWithEmbedToken(token: string, playlistId: string, limit: number, startOffset = 0): Promise<SpotifyTrack[]> {
     interface PageItem {
       track: {
         name: string;
@@ -299,7 +343,7 @@ export default class {
 
     const tracks: SpotifyTrack[] = [];
     const headers = {Authorization: `Bearer ${token}`};
-    let offset = 0;
+    let offset = startOffset;
     let consecutiveFailures = 0;
     const MAX_FAILURES = 3;
 

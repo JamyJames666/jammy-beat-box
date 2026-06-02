@@ -20,7 +20,7 @@ import {
   Shuffle, GripVertical, X, Music, Trash2, ListMusic, ImageIcon,
   ChevronsUp, Search, ListPlus,
 } from 'lucide-react'
-import { shuffle, clearQueue, move, remove, flushPending, refreshThumbnails, type TrackInfo } from '@/lib/api'
+import { shuffle, clearQueue, move, remove, flushPending, refreshThumbnails, loadMoreSpotify, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
@@ -176,10 +176,11 @@ interface Props {
   guildId: string
   onRefresh: () => void
   pendingCount?: number
+  spotifyHasMore?: boolean
 }
 
 export default function QueueCard({
-  queue, token, guildId, onRefresh, pendingCount = 0,
+  queue, token, guildId, onRefresh, pendingCount = 0, spotifyHasMore = false,
 }: Props) {
   const [optimisticQueue, setOptimisticQueue] = useState<TrackInfo[] | null>(null)
   const [search, setSearch]                   = useState('')
@@ -247,11 +248,20 @@ export default function QueueCard({
     finally { setOptimisticQueue(null); onRefresh() }
   }
 
+  const [loadingMore, setLoadingMore] = useState(false)
+
   const handleBringToQueue = async () => {
     setBringingToQueue(true)
     try { await flushPending(token, guildId, 9999); onRefresh() }
     catch { /* non-fatal */ }
     finally { setBringingToQueue(false) }
+  }
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true)
+    try { await loadMoreSpotify(token, guildId); onRefresh() }
+    catch { /* non-fatal */ }
+    finally { setLoadingMore(false) }
   }
 
   return (
@@ -287,6 +297,20 @@ export default function QueueCard({
           <ListPlus size={12} />
           {bringingToQueue ? 'Loading…' : pendingCount > 0 ? `Load Lazy Songs (${pendingCount})` : 'Load Lazy Songs'}
         </button>
+
+        {/* Load More from Spotify — fetch the next batch beyond what was initially loaded */}
+        {spotifyHasMore && (
+          <button
+            onClick={handleLoadMore}
+            disabled={loadingMore}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+            style={{ background: 'rgba(29,185,84,0.15)', color: '#1db954', border: '1px solid rgba(29,185,84,0.35)' }}
+            title="Fetch the next 200 songs from this Spotify playlist"
+          >
+            <ListPlus size={12} />
+            {loadingMore ? 'Loading…' : 'Load More from Spotify'}
+          </button>
+        )}
 
         <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"

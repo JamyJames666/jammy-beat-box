@@ -1,4 +1,4 @@
-import {inject, injectable} from 'inversify';
+import {inject, injectable, optional} from 'inversify';
 import {createServer} from 'http';
 import express from 'express';
 import crypto from 'crypto';
@@ -9,6 +9,7 @@ import {TYPES} from '../types.js';
 import Config from './config.js';
 import PlayerManager from '../managers/player.js';
 import GetSongs from './get-songs.js';
+import SpotifyApi from './spotify-api.js';
 import {STATUS, type AudioEffect, AUDIO_EFFECT_FILTERS} from './player.js';
 import {getGuildSettings} from '../utils/get-guild-settings.js';
 import {prisma} from '../utils/db.js';
@@ -131,12 +132,15 @@ export default class WebServer {
   private readonly playerManager: PlayerManager;
   private readonly client: Client;
   private readonly getSongs: GetSongs;
+  private readonly spotifyApi?: SpotifyApi;
 
+  // eslint-disable-next-line max-params
   constructor(
     @inject(TYPES.Config) config: Config,
     @inject(TYPES.Managers.Player) playerManager: PlayerManager,
     @inject(TYPES.Client) client: Client,
     @inject(TYPES.Services.GetSongs) getSongs: GetSongs,
+    @inject(TYPES.Services.SpotifyAPI) @optional() spotifyApi?: SpotifyApi,
   ) {
     this.config = config;
     this.password = config.WEB_PASSWORD;
@@ -144,6 +148,7 @@ export default class WebServer {
     this.playerManager = playerManager;
     this.client = client;
     this.getSongs = getSongs;
+    this.spotifyApi = spotifyApi;
   }
 
   start(): void {
@@ -329,8 +334,12 @@ export default class WebServer {
           await player.play();
         }
 
-        // Resolve YouTube thumbnails for queued Spotify tracks in the background.
-        // Results appear in the queue UI as each search completes (~3 concurrent).
+        // Store Spotify playlist context so "Load More" can fetch the next batch
+        if (query.includes('spotify.com/playlist') || query.startsWith('spotify:playlist:')) {
+          player.spotifyPlaylistContext = {url: query, loadedCount: songs.length};
+        }
+
+        // Resolve thumbnails for queued Spotify tracks in the background.
         player.prefetchThumbnails();
 
         // Announce to Discord that the web dashboard added songs
@@ -382,6 +391,7 @@ export default class WebServer {
         loopQueue: player.loopCurrentQueue,
         pendingCount: player.getPendingCount(),
         pendingPreview: player.getPendingPreview(20).map(s => ({title: s.title, artist: s.artist})),
+        spotifyHasMore: player.spotifyPlaylistContext !== null,
       });
     });
 
@@ -494,6 +504,70 @@ export default class WebServer {
         const missing = player.getQueue().filter(s => !s.thumbnailUrl).length;
         player.prefetchThumbnails();
         res.json({ok: true, missing});
+      } catch (e: unknown) {
+        res.status(400).json({error: (e as Error).message});
+      }
+    });
+
+    // Fetch the next batch of songs from a Spotify playlist where we left off.
+    // Uses a fresh embed token each time, so it can succeed even if the first
+    // load was rate-limited.
+    this.app.post('/api/guilds/:guildId/queue/load-more-spotify', auth, async (req: express.Request, res: express.Response) => {
+      try {
+        const player = this.playerManager.get(req.params.guildId);
+        const ctx = player.spotifyPlaylistContext;
+        if (!ctx) {
+          res.status(400).json({error: 'No Spotify playlist context stored. Add a playlist first.'});
+          return;
+        }
+
+        if (!this.spotifyApi) {
+          res.status(400).json({error: 'Spotify is not configured.'});
+          return;
+        }
+
+        const BATCH = 200;
+        const newTracks = await this.spotifyApi.getPlaylistFrom(ctx.url, ctx.loadedCount, BATCH);
+
+        if (newTracks.length === 0) {
+          res.json({ok: true, added: 0, message: 'No more songs to load from this playlist.'});
+          return;
+        }
+
+        // Deduplicate against what's already in the queue by title+artist
+        const inQueue = new Set(
+          [...player.getQueue()].map(s => `${s.title.toLowerCase()}|${s.artist.toLowerCase()}`),
+        );
+        const guild = this.client.guilds.cache.get(req.params.guildId);
+        const fallbackChannelId = guild?.channels.cache.find(c => c.type === 4 /* GuildVoice */)?.id ?? '';
+
+        let added = 0;
+        for (const track of newTracks) {
+          const key = `${track.name.toLowerCase()}|${track.artist.toLowerCase()}`;
+          if (!inQueue.has(key)) {
+            player.add({
+              source: 0, // MediaSource.Youtube
+              title: track.name,
+              artist: track.artist,
+              url: `ytsearch1:${track.name} ${track.artist} lyric video`,
+              length: track.durationSeconds,
+              offset: 0,
+              playlist: {title: 'Spotify Playlist', source: ctx.url},
+              isLive: false,
+              thumbnailUrl: track.thumbnailUrl,
+              addedInChannelId: fallbackChannelId,
+              requestedBy: 'web-dashboard',
+            });
+            inQueue.add(key);
+            added++;
+          }
+        }
+
+        // Advance the stored offset so the next "Load More" gets a fresh batch
+        player.spotifyPlaylistContext = {url: ctx.url, loadedCount: ctx.loadedCount + newTracks.length};
+
+        player.prefetchThumbnails();
+        res.json({ok: true, added, nextOffset: player.spotifyPlaylistContext.loadedCount});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }
