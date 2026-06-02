@@ -36,14 +36,10 @@ export default class {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
 
     // ── Attempt 1: client credentials token → direct HTTP pagination ───────
-    // Use cached token; if missing (background refresh failed at startup), grant fresh.
+    // Always grant a fresh token — cached token may be stale.
     try {
-      let clientToken = this.spotify.getAccessToken();
-      if (!clientToken) {
-        const auth = await this.spotify.clientCredentialsGrant();
-        clientToken = auth.body.access_token;
-        this.spotify.setAccessToken(clientToken);
-      }
+      const auth = await this.spotify.clientCredentialsGrant();
+      const clientToken = auth.body.access_token;
 
       const metaRaw = await got(
         `https://api.spotify.com/v1/playlists/${uri.id}?fields=name,href`,
@@ -51,7 +47,7 @@ export default class {
       ).text();
       const meta = JSON.parse(metaRaw) as {name?: string; href?: string};
 
-      const tracks = await this.paginateWithEmbedToken(clientToken, uri.id, playlistLimit);
+      const tracks = await this.paginatePlaylist(clientToken, uri.id, playlistLimit);
       if (tracks.length > 0) {
         return [tracks, {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? url}];
       }
@@ -191,6 +187,62 @@ export default class {
     } catch {
       return null;
     }
+  }
+
+  // Offset-based pagination — per-page error handling so one failed page
+  // doesn't lose all previously collected tracks.
+  private async paginatePlaylist(token: string, playlistId: string, limit: number): Promise<SpotifyTrack[]> {
+    interface PageItem {
+      track: {
+        name: string;
+        type: string;
+        duration_ms: number;
+        artists: Array<{name: string}>;
+        album: {images: Array<{url: string}>};
+      } | null;
+    }
+
+    const tracks: SpotifyTrack[] = [];
+    const headers = {Authorization: `Bearer ${token}`};
+    const PAGE_SIZE = 50;
+    let offset = 0;
+
+    while (tracks.length < limit) {
+      let page: {items: PageItem[]; next: string | null; total: number} | null = null;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const raw = await got(
+          `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=${PAGE_SIZE}&offset=${offset}`,
+          {headers, timeout: {request: 10_000}},
+        ).text();
+        page = JSON.parse(raw) as {items: PageItem[]; next: string | null; total: number};
+      } catch {
+        break;
+      }
+
+      let added = 0;
+      for (const item of page.items) {
+        if (item.track && item.track.type === 'track') {
+          tracks.push({
+            name: item.track.name,
+            artist: item.track.artists[0]?.name ?? '',
+            durationSeconds: Math.round((item.track.duration_ms ?? 0) / 1000),
+            thumbnailUrl: item.track.album?.images?.[0]?.url ?? null,
+          });
+          added++;
+        }
+      }
+
+      offset += PAGE_SIZE;
+      // Stop if: no next page, received fewer than PAGE_SIZE items, or nothing useful this page
+      if (!page.next || page.items.length < PAGE_SIZE || added === 0) break;
+
+      // Small pause to avoid hitting Spotify rate limits
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise<void>(resolve => { setTimeout(resolve, 150); });
+    }
+
+    return tracks;
   }
 
   private async paginateWithEmbedToken(token: string, playlistId: string, limit: number): Promise<SpotifyTrack[]> {
