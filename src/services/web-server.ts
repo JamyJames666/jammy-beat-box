@@ -526,7 +526,7 @@ export default class WebServer {
           return;
         }
 
-        const BATCH = 200;
+        const BATCH = 100; // Spotify's embed token tolerates ~2 pages (50 each) per request
         const newTracks = await this.spotifyApi.getPlaylistFrom(ctx.url, ctx.loadedCount, BATCH);
 
         if (newTracks.length === 0) {
