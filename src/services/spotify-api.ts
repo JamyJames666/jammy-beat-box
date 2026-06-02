@@ -187,10 +187,23 @@ export default class {
 
   private async getAnonymousToken(userAgent: string): Promise<string | null> {
     try {
+      // Spotify requires the sp_t session cookie — get it by hitting the main page first.
+      const homeRes = await got('https://open.spotify.com/', {
+        headers: {'User-Agent': userAgent},
+        timeout: {request: 10_000},
+        followRedirect: true,
+      });
+      const rawCookies: string[] = (homeRes.headers['set-cookie'] as string[] | undefined) ?? [];
+      const cookieHeader = rawCookies.map((c: string) => c.split(';')[0]).join('; ');
+
       const raw = await got(
         'https://open.spotify.com/get_access_token?reason=transport&productType=web_player',
         {
-          headers: {'User-Agent': userAgent, 'Accept': 'application/json'},
+          headers: {
+            'User-Agent': userAgent,
+            'Accept': 'application/json',
+            'Cookie': cookieHeader,
+          },
           timeout: {request: 8_000},
         },
       ).text();

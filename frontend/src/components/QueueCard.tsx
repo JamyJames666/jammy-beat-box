@@ -248,7 +248,7 @@ export default function QueueCard({
 
   const handleBringToQueue = async () => {
     setBringingToQueue(true)
-    try { await flushPending(token, guildId, 100); onRefresh() }
+    try { await flushPending(token, guildId, 9999); onRefresh() }
     catch { /* non-fatal */ }
     finally { setBringingToQueue(false) }
   }
