@@ -69,9 +69,9 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
 
       {!active ? (
         <div className="flex flex-col items-center gap-4 py-10 z-10">
-          <div className="w-48 h-48 rounded-2xl flex items-center justify-center"
+          <div className="w-72 h-72 rounded-2xl flex items-center justify-center"
             style={{ background: '#1c1c1c' }}>
-            <Music size={44} style={{ color: '#444' }} />
+            <Music size={56} style={{ color: '#444' }} />
           </div>
           <p className="text-white font-bold text-lg">Nothing playing</p>
           <p className="text-sm" style={{ color: '#666' }}>Add a song to get started</p>
@@ -84,14 +84,14 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
               <img
                 src={np.thumbnailUrl}
                 alt={np.title}
-                className="w-52 h-52 rounded-2xl object-cover"
-                style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.7)' }}
+                className="w-72 h-72 rounded-2xl object-cover"
+                style={{ boxShadow: '0 12px 60px rgba(0,0,0,0.75)' }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
             ) : (
-              <div className="w-52 h-52 rounded-2xl flex items-center justify-center"
+              <div className="w-72 h-72 rounded-2xl flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, #2a2a2a, #1c1c1c)' }}>
-                <Music size={40} style={{ color: '#555' }} />
+                <Music size={56} style={{ color: '#555' }} />
               </div>
             )}
             {/* Playing bars */}

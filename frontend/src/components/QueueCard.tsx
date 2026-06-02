@@ -34,6 +34,17 @@ function getHighQualityThumb(url: string | null): string | null {
   return url
 }
 
+// Deterministic color gradient from title string
+function titleToGradient(title: string): string {
+  let hash = 0
+  for (let i = 0; i < title.length; i++) {
+    hash = (hash * 31 + title.charCodeAt(i)) | 0
+  }
+  const hue = Math.abs(hash) % 360
+  const hue2 = (hue + 40) % 360
+  return `linear-gradient(135deg, hsl(${hue},55%,28%) 0%, hsl(${hue2},50%,20%) 100%)`
+}
+
 // ── Row ───────────────────────────────────────────────────────────────────────
 
 interface RowProps {
@@ -62,7 +73,7 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
       ref={setNodeRef}
       style={{ ...style }}
       className={cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors duration-100 group',
+        'flex items-center gap-3 px-3 py-3.5 rounded-xl transition-colors duration-100 group',
         isDragging ? 'opacity-40' : 'hover:bg-app-panel',
       )}
     >
@@ -91,7 +102,7 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
           src={thumbSrc}
           alt=""
           loading="lazy"
-          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+          className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
           onError={e => {
             const img = e.target as HTMLImageElement
             if (img.src.includes('ytimg.com') && img.src.includes('hqdefault')) {
@@ -102,18 +113,21 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
           }}
         />
       ) : (
-        <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-app-panel">
-          <Music size={14} style={{ color: '#555' }} />
+        <div
+          className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: titleToGradient(item.title ?? '') }}
+        >
+          <Music size={18} style={{ color: 'rgba(255,255,255,0.45)' }} />
         </div>
       )}
 
       {/* Title + artist */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate text-white" title={item.title}>
+        <p className="text-base font-semibold truncate text-white" title={item.title}>
           {item.title}
         </p>
         <div className="flex items-center gap-1.5 mt-0.5">
-          <p className="text-xs truncate" style={{ color: '#888' }}>{item.artist}</p>
+          <p className="text-sm truncate" style={{ color: '#888' }}>{item.artist}</p>
           {item.source && <SourceBadge source={item.source} />}
         </div>
       </div>
@@ -126,7 +140,7 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
       {/* Skip to top */}
       {displayNumber > 1 && (
         <button
-          className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center
+          className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center
                      opacity-0 group-hover:opacity-100 transition-all hover:bg-app-border"
           style={{ color: '#888' }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#fff' }}
@@ -134,13 +148,13 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
           onClick={onMoveToTop}
           title="Play next"
         >
-          <ChevronsUp size={13} />
+          <ChevronsUp size={14} />
         </button>
       )}
 
       {/* Remove */}
       <button
-        className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center
+        className="flex-shrink-0 w-7 h-7 rounded-md flex items-center justify-center
                    opacity-0 group-hover:opacity-100 transition-all hover:bg-app-danger/20"
         style={{ color: '#888' }}
         onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#f43f5e' }}
@@ -148,7 +162,7 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
         onClick={onRemove}
         title="Remove"
       >
-        <X size={13} />
+        <X size={14} />
       </button>
     </li>
   )
@@ -292,8 +306,8 @@ export default function QueueCard({
       <div className="flex-1 overflow-y-auto px-2 min-h-0">
         {displayQueue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
-            <div className="w-12 h-12 rounded-xl bg-app-panel flex items-center justify-center">
-              <Music size={18} style={{ color: '#555' }} />
+            <div className="w-14 h-14 rounded-xl bg-app-panel flex items-center justify-center">
+              <Music size={22} style={{ color: '#555' }} />
             </div>
             <p className="text-sm" style={{ color: '#888' }}>Queue is empty</p>
           </div>

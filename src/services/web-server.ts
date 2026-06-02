@@ -374,7 +374,7 @@ export default class WebServer {
         loopSong: player.loopCurrentSong,
         loopQueue: player.loopCurrentQueue,
         pendingCount: player.getPendingCount(),
-        pendingPreview: player.getPendingPreview(10).map(s => ({title: s.title, artist: s.artist})),
+        pendingPreview: player.getPendingPreview(20).map(s => ({title: s.title, artist: s.artist})),
       });
     });
 

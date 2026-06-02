@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Music2, ChevronDown, Sun, Moon } from 'lucide-react'
+import { ChevronDown, Sun, Moon } from 'lucide-react'
 import {
   getGuilds, getChannels, getStatus,
   ApiError,
@@ -16,6 +16,25 @@ interface Props {
   token: string
   onSessionExpired: () => void
   onReconnecting: (v: boolean) => void
+}
+
+// Inline SVG logo — equalizer bars
+function JammyLogo() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="28" height="28" rx="8" fill="url(#logoGrad)" />
+      <rect x="5"  y="16" width="3.5" height="7"  rx="1.5" fill="white" opacity="0.9" />
+      <rect x="10" y="10" width="3.5" height="13" rx="1.5" fill="white" />
+      <rect x="15" y="13" width="3.5" height="10" rx="1.5" fill="white" opacity="0.85" />
+      <rect x="20" y="7"  width="3.5" height="16" rx="1.5" fill="white" opacity="0.7" />
+      <defs>
+        <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#a855f7" />
+          <stop offset="100%" stopColor="#6366f1" />
+        </linearGradient>
+      </defs>
+    </svg>
+  )
 }
 
 export default function Dashboard({ token, onSessionExpired, onReconnecting }: Props) {
@@ -99,13 +118,11 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   return (
     <div className="min-h-screen bg-app-bg">
       {/* Header */}
-      <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-3.5"
-        style={{ background: 'rgba(13,13,13,0.9)', borderBottom: '1px solid #1f1f1f' }}>
+      <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-3"
+        style={{ background: 'rgba(13,13,13,0.92)', borderBottom: '1px solid #1f1f1f' }}>
         <div className="max-w-[1800px] mx-auto flex items-center gap-4">
           <div className="flex items-center gap-2.5 mr-auto">
-            <div className="w-8 h-8 rounded-xl bg-app-accent/20 flex items-center justify-center">
-              <Music2 size={16} className="text-app-accent" />
-            </div>
+            <JammyLogo />
             <span className="font-bold text-white text-base tracking-tight">Jammy Beat Box</span>
           </div>
 
@@ -145,19 +162,22 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       ) : _view === 'autodj' ? (
         <AutoDj status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
-        <div className="max-w-[1800px] mx-auto flex gap-0" style={{ height: 'calc(100vh - 57px)' }}>
+        <div className="max-w-[1800px] mx-auto flex" style={{ height: 'calc(100vh - 53px)' }}>
 
-          {/* Left column: Now Playing */}
-          <div className="flex-shrink-0 relative overflow-hidden flex flex-col"
-            style={{ width: 440 }}>
-            <div className="relative z-10 flex flex-col gap-4 p-6 h-full">
-              <NowPlaying
-                status={status}
-                token={token}
-                guildId={guildId}
-                onRefresh={poll}
-              />
-              <div className="mt-auto flex flex-col gap-3">
+          {/* Left: Now Playing */}
+          <div className="flex-shrink-0 relative overflow-hidden flex flex-col" style={{ width: 520 }}>
+            {/* Ambient glow */}
+            <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
+              style={{
+                top: 40, width: 360, height: 360,
+                background: 'radial-gradient(circle, rgba(210,130,50,0.28) 0%, rgba(160,80,20,0.1) 50%, transparent 70%)',
+                filter: 'blur(50px)',
+                borderRadius: '50%',
+                zIndex: 0,
+              }} />
+            <div className="relative z-10 flex flex-col gap-4 p-6 h-full overflow-y-auto">
+              <NowPlaying status={status} token={token} guildId={guildId} onRefresh={poll} />
+              <div className="mt-auto flex flex-col gap-3 pt-4">
                 <AddToQueue
                   token={token}
                   guildId={guildId}
@@ -172,10 +192,10 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
           </div>
 
           {/* Divider */}
-          <div className="flex-shrink-0" style={{ width: 1, background: '#1f1f1f' }} />
+          <div className="flex-shrink-0" style={{ width: 1, background: '#1a1a1a' }} />
 
-          {/* Right column: Queue */}
-          <div className="flex-1 overflow-hidden flex flex-col p-6">
+          {/* Right: Queue */}
+          <div className="flex-1 overflow-hidden p-6">
             <QueueCard
               queue={status?.queue ?? []}
               token={token}
