@@ -150,19 +150,30 @@ export default class {
       ?? (/"accessToken":"([^"]+)"/.exec(html)?.[1])
       ?? null;
 
-    if (embedToken) {
-      const paginated = await this.paginateWithEmbedToken(embedToken, playlistId, playlistLimit);
-      if (paginated.length > tracks.length) {
-        tracks = paginated;
-      }
-    }
+    // Only bother paginating if the playlist likely has more than the embed returned.
+    // Check the total track count from the API first so we know what we're dealing with.
+    const tokenToUse = embedToken ?? await this.getAnonymousToken(BROWSER_UA);
 
-    // If still only have embed tracks, try the anonymous Spotify web-player token
-    // endpoint — returns a short-lived public token, no credentials needed.
-    if (tracks.length <= entity.trackList.length) {
-      const anonToken = await this.getAnonymousToken(BROWSER_UA);
-      if (anonToken) {
-        const paginated = await this.paginateWithEmbedToken(anonToken, playlistId, playlistLimit);
+    if (tokenToUse) {
+      try {
+        const firstPageRaw = await got(
+          `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=1&offset=0`,
+          {headers: {Authorization: `Bearer ${tokenToUse}`}, timeout: {request: 8_000}},
+        ).text();
+        const firstPage = JSON.parse(firstPageRaw) as {total?: number};
+        const totalInPlaylist = firstPage.total ?? 0;
+
+        if (totalInPlaylist > entity.trackList.length) {
+          // Playlist has more songs than the embed returned — paginate the full list
+          const paginated = await this.paginateWithEmbedToken(tokenToUse, playlistId, Math.min(playlistLimit, totalInPlaylist));
+          if (paginated.length > tracks.length) {
+            tracks = paginated;
+          }
+        }
+        // If totalInPlaylist <= embed count, the embed already gave us everything
+      } catch {
+        // Could not check total — attempt pagination anyway as a best-effort
+        const paginated = await this.paginateWithEmbedToken(tokenToUse, playlistId, playlistLimit);
         if (paginated.length > tracks.length) {
           tracks = paginated;
         }
@@ -280,37 +291,71 @@ export default class {
       } | null;
     }
 
+    interface TracksPage {
+      items: PageItem[];
+      next: string | null;
+      total?: number;
+    }
+
     const tracks: SpotifyTrack[] = [];
     const headers = {Authorization: `Bearer ${token}`};
-    let nextUrl: string | null = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=0`;
+    let offset = 0;
+    let consecutiveFailures = 0;
+    const MAX_FAILURES = 3;
 
-    try {
-      while (nextUrl !== null && tracks.length < limit) {
-        // eslint-disable-next-line no-await-in-loop
-        const raw = await got(nextUrl, {headers, timeout: {request: 10_000}}).text();
-        const body = JSON.parse(raw) as {items: PageItem[]; next: string | null};
-        for (const item of body.items) {
-          if (item.track && item.track.type === 'track') {
-            tracks.push({
-              name: item.track.name,
-              artist: item.track.artists[0]?.name ?? '',
-              durationSeconds: Math.round((item.track.duration_ms ?? 0) / 1000),
-              thumbnailUrl: item.track.album?.images?.[0]?.url ?? null,
+    while (tracks.length < limit) {
+      const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=${offset}`;
+      let body: TracksPage | null = null;
+
+      // Retry with backoff on rate-limit (429) — up to MAX_FAILURES times
+      for (let attempt = 0; attempt < MAX_FAILURES; attempt++) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const raw = await got(url, {headers, timeout: {request: 12_000}}).text();
+          body = JSON.parse(raw) as TracksPage;
+          consecutiveFailures = 0;
+          break;
+        } catch (err: unknown) {
+          const status = (err as {response?: {statusCode?: number}}).response?.statusCode;
+          if (status === 429 && attempt < MAX_FAILURES - 1) {
+            // Rate limited — wait progressively longer before retrying
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise<void>(resolve => {
+              setTimeout(resolve, (attempt + 1) * 2000);
             });
+          } else {
+            consecutiveFailures++;
+            break;
           }
         }
+      }
 
-        nextUrl = tracks.length < limit ? (body.next ?? null) : null;
-        if (nextUrl !== null) {
-          // Small pause between pages to avoid hitting Spotify's rate limit
-          // eslint-disable-next-line no-await-in-loop
-          await new Promise<void>(resolve => {
-            setTimeout(resolve, 200);
+      if (!body?.items || consecutiveFailures >= MAX_FAILURES) {
+        break;
+      }
+
+      for (const item of body.items) {
+        if (item.track && item.track.type === 'track') {
+          tracks.push({
+            name: item.track.name,
+            artist: item.track.artists[0]?.name ?? '',
+            durationSeconds: Math.round((item.track.duration_ms ?? 0) / 1000),
+            thumbnailUrl: item.track.album?.images?.[0]?.url ?? null,
           });
         }
       }
-    } catch {
-      // Token expired or rate-limited — return whatever we collected
+
+      // Stop if this is the last page or we've hit the limit
+      if (!body.next || body.items.length === 0 || tracks.length >= limit) {
+        break;
+      }
+
+      offset += 50;
+      // Polite delay between pages
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 300);
+      });
     }
 
     return tracks;
