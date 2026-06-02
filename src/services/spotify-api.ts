@@ -35,24 +35,41 @@ export default class {
   async getPlaylist(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
 
-    // ── Attempt 1: client credentials token → direct HTTP pagination ───────
-    // Always grant a fresh token — cached token may be stale.
-    try {
-      const auth = await this.spotify.clientCredentialsGrant();
-      const clientToken = auth.body.access_token;
+    // ── Attempt 1: raw HTTP token grant → bypasses spotify-web-api-node ───
+    // clientCredentialsGrant() in the library silently swallows errors;
+    // a direct POST to Spotify's token endpoint is simpler and more debuggable.
+    const clientId = this.spotify.getClientId();
+    const clientSecret = this.spotify.getClientSecret();
+    if (clientId && clientSecret) {
+      try {
+        const creds = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+        const tokenRaw = await got('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${creds}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: 'grant_type=client_credentials',
+          timeout: {request: 10_000},
+        }).text();
+        const tokenData = JSON.parse(tokenRaw) as {access_token?: string};
+        const clientToken = tokenData.access_token;
 
-      const metaRaw = await got(
-        `https://api.spotify.com/v1/playlists/${uri.id}?fields=name,href`,
-        {headers: {Authorization: `Bearer ${clientToken}`}, timeout: {request: 10_000}},
-      ).text();
-      const meta = JSON.parse(metaRaw) as {name?: string; href?: string};
+        if (clientToken) {
+          const metaRaw = await got(
+            `https://api.spotify.com/v1/playlists/${uri.id}?fields=name,href`,
+            {headers: {Authorization: `Bearer ${clientToken}`}, timeout: {request: 10_000}},
+          ).text();
+          const meta = JSON.parse(metaRaw) as {name?: string; href?: string};
 
-      const tracks = await this.paginatePlaylist(clientToken, uri.id, playlistLimit);
-      if (tracks.length > 0) {
-        return [tracks, {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? url}];
+          const tracks = await this.paginatePlaylist(clientToken, uri.id, playlistLimit);
+          if (tracks.length > 0) {
+            return [tracks, {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? url}];
+          }
+        }
+      } catch {
+        // fall through to embed scrape
       }
-    } catch {
-      // credentials invalid or network error → fall through to embed scrape
     }
 
     // ── Attempt 2: scrape Spotify embed page directly (no auth required) ──
@@ -219,6 +236,8 @@ export default class {
       } catch {
         break;
       }
+
+      if (!page?.items) break;
 
       let added = 0;
       for (const item of page.items) {
