@@ -18,13 +18,13 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import {
   Shuffle, GripVertical, X, Music, Trash2, ListMusic,
-  ChevronsUp, Search, ChevronLeft, ChevronRight, ListPlus,
+  ChevronsUp, Search, ListPlus,
 } from 'lucide-react'
 import { shuffle, clearQueue, move, remove, flushPending, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
 import SourceBadge from './SourceBadge'
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 99999 // no pagination — one scrollable list
 
 function getHighQualityThumb(url: string | null): string | null {
   if (!url) return null
@@ -293,6 +293,11 @@ export default function QueueCard({
           disabled={displayQueue.length < 2}
         >
           <Shuffle size={12} /> Shuffle
+          {pendingCount > 0 && (
+            <span className="text-[10px] opacity-60" title={`Shuffles ${displayQueue.length} active + ${pendingCount} pending = ${displayQueue.length + pendingCount} total`}>
+              ({displayQueue.length + pendingCount})
+            </span>
+          )}
         </button>
         <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5 hover:text-app-danger"
@@ -360,25 +365,10 @@ export default function QueueCard({
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between px-5 py-2 flex-shrink-0 border-t border-app-border/60">
-          <span className="text-xs" style={{ color: '#666' }}>
-            Page {safePage + 1} / {totalPages}
-            {isSearching && ` · ${filteredItems.length} results`}
-          </span>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={safePage === 0}
-              className="w-6 h-6 rounded flex items-center justify-center disabled:opacity-30 hover:bg-app-panel transition-colors"
-              style={{ color: '#888' }}>
-              <ChevronLeft size={14} />
-            </button>
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1}
-              className="w-6 h-6 rounded flex items-center justify-center disabled:opacity-30 hover:bg-app-panel transition-colors"
-              style={{ color: '#888' }}>
-              <ChevronRight size={14} />
-            </button>
-          </div>
+      {/* Search result count when filtering */}
+      {isSearching && (
+        <div className="px-5 py-1.5 flex-shrink-0 border-t border-app-border/60">
+          <span className="text-xs" style={{ color: '#666' }}>{filteredItems.length} results</span>
         </div>
       )}
 

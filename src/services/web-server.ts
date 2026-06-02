@@ -298,17 +298,9 @@ export default class WebServer {
           }
         }
 
-        // First 50 go into the active queue; the rest become pending.
-        const ACTIVE_LIMIT = 50;
-        const activeSongs = songs.slice(0, ACTIVE_LIMIT);
-        const pendingSongs = songs.slice(ACTIVE_LIMIT).map(s => ({
-          song: s,
-          channelId: targetChannelId,
-          requestedBy: 'web-dashboard',
-        }));
-        player.setPendingSongs([...player.getPendingCount() > 0 ? [] : [], ...pendingSongs]);
-
-        activeSongs.forEach(song => {
+        // All fetched songs go straight into the active queue — no pending split.
+        // The Spotify layer caps at 500; the queue UI handles large lists fine.
+        songs.forEach(song => {
           player.add({
             ...song,
             addedInChannelId: targetChannelId,
@@ -335,7 +327,7 @@ export default class WebServer {
           announceCh.send(msg).catch(() => { /* best-effort */ });
         }
 
-        res.json({ok: true, added: songs.length, queued: activeSongs.length, pending: pendingSongs.length, first: songs[0].title});
+        res.json({ok: true, added: songs.length, first: songs[0].title});
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }

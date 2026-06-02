@@ -1,4 +1,3 @@
-import {URL} from 'url';
 import {inject, injectable} from 'inversify';
 import * as spotifyURI from 'spotify-uri';
 import Spotify from 'spotify-web-api-node';
@@ -68,7 +67,7 @@ export default class {
           }
         }
       } catch {
-        // fall through to embed scrape
+        // Fall through to embed scrape
       }
     }
 
@@ -137,19 +136,19 @@ export default class {
 
     // Try several token sources in order of reliability.
     // Any valid token lets us call the real Spotify API for the full list.
-    const embedToken: string | null =
+    const embedToken: string | null
       // 1. Various JSON paths Spotify has used across embed versions
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (pageData?.props?.pageProps?.accessToken as string | undefined) ??
+      = (pageData?.props?.pageProps?.accessToken as string | undefined)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (pageData?.props?.pageProps?.state?.session?.accessToken as string | undefined) ??
+      ?? (pageData?.props?.pageProps?.state?.session?.accessToken as string | undefined)
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (pageData?.props?.pageProps?.state?.data?.accessToken as string | undefined) ??
+      ?? (pageData?.props?.pageProps?.state?.data?.accessToken as string | undefined)
       // 2. Regex over the full __NEXT_DATA__ JSON string
-      (/"accessToken":"([^"]+)"/.exec(match[1])?.[1]) ??
+      ?? (/"accessToken":"([^"]+)"/.exec(match[1])?.[1])
       // 3. Regex over the entire HTML (token sometimes lives outside __NEXT_DATA__)
-      (/"accessToken":"([^"]+)"/.exec(html)?.[1]) ??
-      null;
+      ?? (/"accessToken":"([^"]+)"/.exec(html)?.[1])
+      ?? null;
 
     if (embedToken) {
       const paginated = await this.paginateWithEmbedToken(embedToken, playlistId, playlistLimit);
@@ -186,7 +185,7 @@ export default class {
         timeout: {request: 10_000},
         followRedirect: true,
       });
-      const rawCookies: string[] = (homeRes.headers['set-cookie'] as string[] | undefined) ?? [];
+      const rawCookies: string[] = (homeRes.headers['set-cookie']) ?? [];
       const cookieHeader = rawCookies.map((c: string) => c.split(';')[0]).join('; ');
 
       const raw = await got(
@@ -194,8 +193,8 @@ export default class {
         {
           headers: {
             'User-Agent': userAgent,
-            'Accept': 'application/json',
-            'Cookie': cookieHeader,
+            Accept: 'application/json',
+            Cookie: cookieHeader,
           },
           timeout: {request: 8_000},
         },
@@ -237,7 +236,9 @@ export default class {
         break;
       }
 
-      if (!page?.items) break;
+      if (!page?.items) {
+        break;
+      }
 
       let added = 0;
       for (const item of page.items) {
@@ -254,11 +255,15 @@ export default class {
 
       offset += PAGE_SIZE;
       // Stop if: no next page, received fewer than PAGE_SIZE items, or nothing useful this page
-      if (!page.next || page.items.length < PAGE_SIZE || added === 0) break;
+      if (!page.next || page.items.length < PAGE_SIZE || added === 0) {
+        break;
+      }
 
       // Small pause to avoid hitting Spotify rate limits
       // eslint-disable-next-line no-await-in-loop
-      await new Promise<void>(resolve => { setTimeout(resolve, 150); });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 150);
+      });
     }
 
     return tracks;

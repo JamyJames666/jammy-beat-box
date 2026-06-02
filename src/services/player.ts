@@ -689,18 +689,26 @@ export default class {
       .slice(0, 20);
 
     const targets: SongMetadata[] = [...active, ...pending];
-    if (targets.length === 0) return;
+    if (targets.length === 0) {
+      return;
+    }
 
-    const deezerLookup = (song: SongMetadata): Promise<void> =>
+    const deezerLookup = async (song: SongMetadata): Promise<void> =>
       new Promise(resolve => {
-        if (song.thumbnailUrl) { resolve(); return; }
+        if (song.thumbnailUrl) {
+          resolve();
+          return;
+        }
+
         const q = encodeURIComponent(`${song.title} ${song.artist}`);
         const req = https.get(
           `https://api.deezer.com/search?q=${q}&limit=1`,
           {headers: {'User-Agent': 'Mozilla/5.0'}},
           (res: {on(e: string, cb: (...a: unknown[]) => void): void}) => {
             let raw = '';
-            res.on('data', (chunk: unknown) => { raw += String(chunk); });
+            res.on('data', (chunk: unknown) => {
+              raw += String(chunk);
+            });
             res.on('end', () => {
               try {
                 const body = JSON.parse(raw) as {data?: Array<{album?: {cover_xl?: string; cover_medium?: string}}>};
@@ -709,19 +717,28 @@ export default class {
                   song.thumbnailUrl = cover;
                 }
               } catch { /* malformed JSON — leave thumbnail null */ }
+
               resolve();
             });
-            res.on('error', () => resolve());
+            res.on('error', () => {
+              resolve();
+            });
           },
         );
-        req.on('error', () => resolve());
-        req.setTimeout(5000, () => { req.destroy(); resolve(); });
+        req.on('error', () => {
+          resolve();
+        });
+        req.setTimeout(5000, () => {
+          req.destroy();
+          resolve();
+        });
       });
 
     // 10 concurrent — well within Deezer's 50 req/5s rate limit
     void (async () => {
       const BATCH = 10;
       for (let i = 0; i < targets.length; i += BATCH) {
+        // eslint-disable-next-line no-await-in-loop
         await Promise.allSettled(targets.slice(i, i + BATCH).map(deezerLookup));
       }
     })();
