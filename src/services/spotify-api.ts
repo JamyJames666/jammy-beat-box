@@ -35,52 +35,29 @@ export default class {
   async getPlaylist(url: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
 
-    // ── Attempt 1: Spotify Web API (Client Credentials) ────────────────────
-    // Use loose != null so both null and undefined track entries are filtered.
-    const onlyTracks = (items: Array<SpotifyApi.TrackObjectFull | SpotifyApi.EpisodeObject | null | undefined>) =>
-      items.filter((t): t is SpotifyApi.TrackObjectFull => t !== null && t !== undefined && t.type === 'track');
-
-    try {
-      let playlistTitle: string;
-      let playlistHref: string;
-      let tracksResponse: SpotifyApi.PagingObject<SpotifyApi.PlaylistTrackObject>;
-
+    // ── Attempt 1: client credentials token → direct HTTP pagination ───────
+    // Using got directly instead of spotify-web-api-node's wrapper avoids
+    // the library swallowing pagination errors and stopping early.
+    const clientToken = this.spotify.getAccessToken();
+    if (clientToken) {
       try {
-        const [{body: playlistResponse}, {body: firstPage}] = await Promise.all([
-          this.spotify.getPlaylist(uri.id),
-          this.spotify.getPlaylistTracks(uri.id, {limit: 50}),
-        ]);
-        playlistTitle = playlistResponse.name;
-        playlistHref = playlistResponse.href;
-        tracksResponse = firstPage;
+        const metaRaw = await got(
+          `https://api.spotify.com/v1/playlists/${uri.id}?fields=name,href`,
+          {headers: {Authorization: `Bearer ${clientToken}`}, timeout: {request: 10_000}},
+        ).text();
+        const meta = JSON.parse(metaRaw) as {name?: string; href?: string};
+
+        const tracks = await this.paginateWithEmbedToken(clientToken, uri.id, playlistLimit);
+        if (tracks.length > 0) {
+          return [tracks, {title: meta.name ?? 'Spotify Playlist', source: meta.href ?? url}];
+        }
       } catch {
-        const {body: firstPage} = await this.spotify.getPlaylistTracks(uri.id, {limit: 50});
-        tracksResponse = firstPage;
-        playlistTitle = 'Spotify Playlist';
-        playlistHref = `https://open.spotify.com/playlist/${uri.id}`;
+        // fall through to embed scrape
       }
-
-      const playlist = {title: playlistTitle, source: playlistHref};
-      const items = onlyTracks(tracksResponse.items.map(i => i.track));
-
-      while (tracksResponse.next) {
-        // eslint-disable-next-line no-await-in-loop
-        ({body: tracksResponse} = await this.spotify.getPlaylistTracks(uri.id, {
-          limit: parseInt(new URL(tracksResponse.next).searchParams.get('limit') ?? '50', 10),
-          offset: parseInt(new URL(tracksResponse.next).searchParams.get('offset') ?? '0', 10),
-        }));
-        items.push(...onlyTracks(tracksResponse.items.map(i => i.track)));
-      }
-
-      if (items.length === 0) {
-        throw new Error('empty');
-      }
-
-      return [this.limitTracks(items, playlistLimit).map(t => this.toSpotifyTrack(t, t.album?.images?.[0]?.url ?? null)), playlist];
-    } catch {
-      // ── Attempt 2: scrape Spotify embed page directly (no auth required) ──
-      return this.getPlaylistViaEmbed(uri.id, url, playlistLimit);
     }
+
+    // ── Attempt 2: scrape Spotify embed page directly (no auth required) ──
+    return this.getPlaylistViaEmbed(uri.id, url, playlistLimit);
   }
 
   async getTrack(url: string): Promise<SpotifyTrack> {
