@@ -18,15 +18,14 @@ interface Props {
   onReconnecting: (v: boolean) => void
 }
 
-// Inline SVG logo — equalizer bars
-function JammyLogo() {
+function JammyLogo({ playing }: { playing: boolean }) {
   return (
     <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
       <rect width="28" height="28" rx="8" fill="url(#logoGrad)" />
-      <rect x="5"  y="16" width="3.5" height="7"  rx="1.5" fill="white" opacity="0.9" />
-      <rect x="10" y="10" width="3.5" height="13" rx="1.5" fill="white" />
-      <rect x="15" y="13" width="3.5" height="10" rx="1.5" fill="white" opacity="0.85" />
-      <rect x="20" y="7"  width="3.5" height="16" rx="1.5" fill="white" opacity="0.7" />
+      <rect x="5"  y="16" width="3.5" height="7"  rx="1.5" fill="white" opacity="0.9"  className={playing ? 'animate-bar'   : undefined} />
+      <rect x="10" y="10" width="3.5" height="13" rx="1.5" fill="white"                className={playing ? 'animate-bar-2' : undefined} />
+      <rect x="15" y="13" width="3.5" height="10" rx="1.5" fill="white" opacity="0.85" className={playing ? 'animate-bar-3' : undefined} />
+      <rect x="20" y="7"  width="3.5" height="16" rx="1.5" fill="white" opacity="0.7"  className={playing ? 'animate-bar'   : undefined} />
       <defs>
         <linearGradient id="logoGrad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#a855f7" />
@@ -44,8 +43,6 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
   const [channelId, setChannelId] = useState<string>('')
   const [status,    setStatus]    = useState<PlayerStatus | null>(null)
   const [_view] = useState<'player' | 'dj' | 'autodj'>('player')
-
-
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() =>
     (localStorage.getItem('muse_theme') as 'dark' | 'light') ?? 'dark',
@@ -119,12 +116,12 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
 
   return (
     <div className="min-h-screen bg-app-bg">
-      {/* Header */}
+      {/* Header — no hard border, fades into content */}
       <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-3"
-        style={{ background: 'rgba(7,6,15,0.88)', borderBottom: '1px solid #2e2b45' }}>
+        style={{ background: 'rgba(7,6,15,0.75)' }}>
         <div className="max-w-[1800px] mx-auto flex items-center gap-4">
           <div className="flex items-center gap-2.5 mr-auto">
-            <JammyLogo />
+            <JammyLogo playing={status?.status === 'PLAYING'} />
             <span className="font-bold text-white text-base tracking-tight">Jammy Beat Box</span>
           </div>
 
@@ -164,10 +161,27 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       ) : _view === 'autodj' ? (
         <AutoDj status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
-        <div className="max-w-[1800px] mx-auto flex" style={{ height: 'calc(100vh - 53px)' }}>
+        <div className="relative flex overflow-hidden" style={{ height: 'calc(100vh - 53px)' }}>
+
+          {/* Full-width blurred art background — covers both halves */}
+          {status?.nowPlaying?.thumbnailUrl && (
+            <div
+              key={status.nowPlaying.thumbnailUrl}
+              className="absolute inset-0 pointer-events-none animate-fade-in"
+              style={{
+                backgroundImage:    `url(${status.nowPlaying.thumbnailUrl})`,
+                backgroundSize:     'cover',
+                backgroundPosition: 'center',
+                filter:             'blur(80px) saturate(2.2) brightness(1.3)',
+                opacity:            0.32,
+                transform:          'scale(1.1)',
+                zIndex:             0,
+              }}
+            />
+          )}
 
           {/* Left: Now Playing */}
-          <div className="flex-shrink-0 relative overflow-hidden flex flex-col" style={{ width: 620 }}>
+          <div className="w-1/2 relative flex flex-col" style={{ zIndex: 1 }}>
             {/* Ambient glow */}
             <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
               style={{
@@ -177,9 +191,9 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
                 borderRadius: '50%',
                 zIndex: 0,
               }} />
-            <div className="relative z-10 flex flex-col gap-4 p-6 h-full overflow-y-auto">
+            <div className="relative z-10 flex flex-col gap-4 p-8 h-full overflow-y-auto">
               <NowPlaying status={status} token={token} guildId={guildId} onRefresh={poll} />
-              <div className="flex flex-col gap-3 pt-2">
+              <div className="mt-auto flex flex-col gap-3 pt-4">
                 <AddToQueue
                   token={token}
                   guildId={guildId}
@@ -193,18 +207,17 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
             </div>
           </div>
 
-          {/* Divider */}
-          <div className="flex-shrink-0" style={{ width: 1, background: '#2e2b45' }} />
-
-          {/* Right: Queue */}
-          <div className="flex-1 overflow-hidden p-6">
+          {/* Right: Queue — transparent, shares the same blurred bg */}
+          <div className="w-1/2 flex flex-col overflow-hidden" style={{ zIndex: 1, borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
             <QueueCard
               queue={status?.queue ?? []}
               token={token}
               guildId={guildId}
               onRefresh={poll}
               pendingCount={status?.pendingCount ?? 0}
-              spotifyHasMore={status?.spotifyHasMore ?? false}
+              nowPlaying={status?.nowPlaying ?? null}
+              position={status?.position ?? 0}
+              isPlaying={status?.status === 'PLAYING'}
             />
           </div>
 

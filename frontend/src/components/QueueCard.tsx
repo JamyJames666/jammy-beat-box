@@ -17,11 +17,12 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  Shuffle, GripVertical, X, Music, Trash2, ListMusic, ImageIcon,
+  Shuffle, GripVertical, X, Music, Trash2, ListMusic,
   ChevronsUp, Search, ListPlus,
 } from 'lucide-react'
-import { shuffle, clearQueue, move, remove, flushPending, refreshThumbnails, loadMoreSpotify, type TrackInfo } from '@/lib/api'
+import { shuffle, clearQueue, move, remove, flushPending, type TrackInfo } from '@/lib/api'
 import { fmtTime, cn } from '@/lib/utils'
+const fmtDuration = fmtTime
 import SourceBadge from './SourceBadge'
 
 const PAGE_SIZE = 99999 // no pagination — one scrollable list
@@ -54,9 +55,10 @@ interface RowProps {
   onRemove: () => void
   onMoveToTop: () => void
   draggable: boolean
+  isUpNext?: boolean
 }
 
-function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }: RowProps) {
+function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable, isUpNext }: RowProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id, disabled: !draggable })
 
@@ -73,8 +75,8 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
       ref={setNodeRef}
       style={{ ...style }}
       className={cn(
-        'flex items-center gap-3 px-3 py-3.5 rounded-xl transition-colors duration-100 group',
-        isDragging ? 'opacity-40' : 'hover:bg-app-panel',
+        'flex items-center gap-3 px-3 py-3.5 rounded-xl transition-all duration-100 group border-l-2 border-transparent',
+        isDragging ? 'opacity-40' : 'hover:bg-app-panel hover:border-l-purple-500/40',
       )}
     >
       {/* Queue number */}
@@ -82,6 +84,14 @@ function QueueRow({ id, item, displayNumber, onRemove, onMoveToTop, draggable }:
         style={{ color: '#555' }}>
         {displayNumber}
       </span>
+
+      {/* Up next badge */}
+      {isUpNext && (
+        <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded flex-shrink-0"
+          style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7' }}>
+          Up next
+        </span>
+      )}
 
       {/* Drag handle */}
       {draggable && (
@@ -176,11 +186,13 @@ interface Props {
   guildId: string
   onRefresh: () => void
   pendingCount?: number
-  spotifyHasMore?: boolean
+  nowPlaying?: TrackInfo | null
+  position?: number
+  isPlaying?: boolean
 }
 
 export default function QueueCard({
-  queue, token, guildId, onRefresh, pendingCount = 0, spotifyHasMore = false,
+  queue, token, guildId, onRefresh, pendingCount = 0, nowPlaying = null, position = 0, isPlaying = false,
 }: Props) {
   const [optimisticQueue, setOptimisticQueue] = useState<TrackInfo[] | null>(null)
   const [search, setSearch]                   = useState('')
@@ -229,9 +241,8 @@ export default function QueueCard({
     }
   }, [displayQueue, token, guildId, onRefresh])
 
-  const handleShuffle       = async () => { await shuffle(token, guildId).catch(() => null); onRefresh() }
-  const handleClearQueue    = async () => { await clearQueue(token, guildId).catch(() => null); onRefresh() }
-  const handleRefreshThumbs = async () => { await refreshThumbnails(token, guildId).catch(() => null); onRefresh() }
+  const handleShuffle    = async () => { await shuffle(token, guildId).catch(() => null); onRefresh() }
+  const handleClearQueue = async () => { await clearQueue(token, guildId).catch(() => null); onRefresh() }
 
   const handleRemove = async (originalIndex: number) => {
     setOptimisticQueue(displayQueue.filter((_, i) => i !== originalIndex))
@@ -248,9 +259,6 @@ export default function QueueCard({
     finally { setOptimisticQueue(null); onRefresh() }
   }
 
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [loadMoreMsg, setLoadMoreMsg] = useState<string | null>(null)
-
   const handleBringToQueue = async () => {
     setBringingToQueue(true)
     try { await flushPending(token, guildId, 9999); onRefresh() }
@@ -258,41 +266,32 @@ export default function QueueCard({
     finally { setBringingToQueue(false) }
   }
 
-  const handleLoadMore = async () => {
-    setLoadingMore(true)
-    setLoadMoreMsg(null)
-    try {
-      const res = await loadMoreSpotify(token, guildId)
-      onRefresh()
-      if (res.added > 0) {
-        setLoadMoreMsg(`+${res.added} songs added`)
-      } else {
-        setLoadMoreMsg(res.message ?? 'No more songs found')
-      }
-      setTimeout(() => setLoadMoreMsg(null), 4000)
-    } catch {
-      setLoadMoreMsg('Failed — try again')
-      setTimeout(() => setLoadMoreMsg(null), 3000)
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
   return (
-    <div className="card flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 140px)' }}>
+    <div className="flex flex-col overflow-hidden h-full">
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 pt-5 pb-3 flex-shrink-0">
+      <div className="flex items-center gap-3 px-8 pt-8 pb-3 flex-shrink-0">
         <ListMusic size={14} className="flex-shrink-0 text-app-accent" />
         <h2 className="text-sm font-semibold">Up Next</h2>
 
-        {/* Song count */}
-        {displayQueue.length > 0 && (
-          <span className="text-xs tabular-nums mr-auto" style={{ color: '#666' }}>
-            {displayQueue.length} songs
-          </span>
+        {/* Song count + duration */}
+        {displayQueue.length > 0 ? (
+          <div className="flex items-center gap-2 mr-auto">
+            <span className="text-xs tabular-nums" style={{ color: '#666' }}>
+              {displayQueue.length} songs
+            </span>
+            {(() => {
+              const totalSec = (nowPlaying?.length ?? 0) + displayQueue.reduce((acc, s) => acc + s.length, 0)
+              return totalSec > 0 ? (
+                <span className="text-xs tabular-nums" style={{ color: '#444' }}>
+                  · {fmtDuration(position)} of {fmtDuration(totalSec)}
+                </span>
+              ) : null
+            })()}
+          </div>
+        ) : (
+          <span className="mr-auto" />
         )}
-        {displayQueue.length === 0 && <span className="mr-auto" />}
 
         {/* Load Lazy Songs — always visible */}
         <button
@@ -312,20 +311,6 @@ export default function QueueCard({
           {bringingToQueue ? 'Loading…' : pendingCount > 0 ? `Load Lazy Songs (${pendingCount})` : 'Load Lazy Songs'}
         </button>
 
-        {/* Load More from Spotify */}
-        {spotifyHasMore && (
-          <button
-            onClick={handleLoadMore}
-            disabled={loadingMore}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all active:scale-95"
-            style={{ background: 'rgba(29,185,84,0.15)', color: '#1db954', border: '1px solid rgba(29,185,84,0.35)' }}
-            title="Fetch the next 200 songs from this Spotify playlist"
-          >
-            <ListPlus size={12} />
-            {loadingMore ? 'Loading…' : 'More Spotify'}
-          </button>
-        )}
-
         <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"
           onClick={handleShuffle}
@@ -339,14 +324,6 @@ export default function QueueCard({
           )}
         </button>
         <button
-          className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5"
-          onClick={handleRefreshThumbs}
-          disabled={displayQueue.length === 0}
-          title="Fetch missing album art from Deezer"
-        >
-          <ImageIcon size={12} />
-        </button>
-        <button
           className="btn-ghost flex items-center gap-1.5 text-xs px-2.5 py-1.5 hover:text-app-danger"
           onClick={handleClearQueue}
           disabled={displayQueue.length === 0}
@@ -355,17 +332,9 @@ export default function QueueCard({
         </button>
       </div>
 
-      {/* Load More result message — shown below the header for visibility */}
-      {loadMoreMsg && (
-        <div className="px-5 py-1.5 flex-shrink-0 text-xs font-medium animate-fade-up"
-          style={{ color: loadMoreMsg.startsWith('+') ? '#1db954' : '#888', borderBottom: '1px solid #1a1a2a' }}>
-          {loadMoreMsg}
-        </div>
-      )}
-
       {/* Search */}
       {displayQueue.length > 0 && (
-        <div className="relative px-5 pb-3 flex-shrink-0">
+        <div className="relative px-8 pb-3 flex-shrink-0">
           <Search size={12} className="absolute left-8 top-1/2 -translate-y-1/2" style={{ color: '#555' }} />
           <input
             type="text"
@@ -384,7 +353,7 @@ export default function QueueCard({
       )}
 
       {/* Queue list — scrollable */}
-      <div className="flex-1 overflow-y-auto px-2 min-h-0">
+      <div className="flex-1 overflow-y-auto px-6 min-h-0">
         {displayQueue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <div className="w-14 h-14 rounded-xl bg-app-panel flex items-center justify-center">
@@ -403,6 +372,41 @@ export default function QueueCard({
               strategy={verticalListSortingStrategy}
             >
               <ul>
+                {/* Pinned now-playing row */}
+                {nowPlaying && !isSearching && (
+                  <li className="flex items-center gap-3 px-3 py-3.5 rounded-xl border-l-2 mb-1"
+                    style={{ background: 'rgba(168,85,247,0.07)', borderLeftColor: '#a855f7' }}>
+                    <span className="text-xs tabular-nums w-5 text-right flex-shrink-0 font-mono"
+                      style={{ color: '#a855f7' }}>♪</span>
+                    {nowPlaying.thumbnailUrl ? (
+                      <img src={nowPlaying.thumbnailUrl} alt="" loading="lazy"
+                        className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: titleToGradient(nowPlaying.title ?? '') }}>
+                        <Music size={18} style={{ color: 'rgba(255,255,255,0.45)' }} />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-base font-semibold truncate" style={{ color: '#a855f7' }}
+                        title={nowPlaying.title}>{nowPlaying.title}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <p className="text-sm truncate" style={{ color: '#888' }}>{nowPlaying.artist}</p>
+                        {nowPlaying.source && <SourceBadge source={nowPlaying.source} />}
+                      </div>
+                    </div>
+                    <span className="text-xs flex-shrink-0 tabular-nums font-mono" style={{ color: '#666' }}>
+                      {fmtTime(nowPlaying.length)}
+                    </span>
+                    {isPlaying && (
+                      <div className="flex items-end gap-[2px] h-4 flex-shrink-0">
+                        <span className="block w-[3px] rounded-sm animate-bar"   style={{ background: '#a855f7' }} />
+                        <span className="block w-[3px] rounded-sm animate-bar-2" style={{ background: '#a855f7' }} />
+                        <span className="block w-[3px] rounded-sm animate-bar-3" style={{ background: '#a855f7' }} />
+                      </div>
+                    )}
+                  </li>
+                )}
                 {pageItems.map(({ item, originalIndex }) => (
                   <QueueRow
                     key={`${item.url}-${originalIndex}`}
@@ -410,6 +414,7 @@ export default function QueueCard({
                     item={item}
                     displayNumber={originalIndex + 1}
                     draggable={!isSearching}
+                    isUpNext={!isSearching && originalIndex === 0}
                     onRemove={() => handleRemove(originalIndex)}
                     onMoveToTop={() => handleMoveToTop(originalIndex)}
                   />
