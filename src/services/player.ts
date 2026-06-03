@@ -103,6 +103,7 @@ export default class {
   private thumbnailFetchInProgress = false;
   private nowPlaying: QueuedSong | null = null;
   private playPositionInterval: NodeJS.Timeout | undefined;
+  private thumbSweepInterval: NodeJS.Timeout | undefined;
   private lastSongURL = '';
 
   private positionInSeconds = 0;
@@ -693,7 +694,6 @@ export default class {
       ...this.queue.filter(noThumb),
       ...this.pendingSongs.map(p => p.song).filter(noThumb),
     ];
-
     if (targets.length === 0) {
       return;
     }
@@ -869,6 +869,12 @@ export default class {
     this.playPositionInterval = setInterval(() => {
       this.positionInSeconds++;
     }, 1000);
+
+    if (!this.thumbSweepInterval) {
+      this.thumbSweepInterval = setInterval(() => {
+        this.prefetchThumbnails();
+      }, 15_000);
+    }
   }
 
   private stopTrackingPosition(): void {
