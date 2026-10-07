@@ -15,18 +15,11 @@
   <img src="docs/dashboard.png" alt="The dashboard, with now playing on the left and a reorderable queue on the right" width="960">
 </p>
 
-<table>
-<tr>
-<td width="62%"><img src="docs/login.png" alt="The dashboard login screen"></td>
-<td width="38%"><img src="docs/mobile.png" alt="The dashboard on a phone, with now playing stacked above the queue"></td>
-</tr>
-<tr>
-<td align="center"><sub>One password, no Discord OAuth round trip.</sub></td>
-<td align="center"><sub>Stacks on a phone.</sub></td>
-</tr>
-</table>
+<p align="center">
+  <img src="docs/login.png" alt="The dashboard login screen" width="720">
+</p>
 
-<p align="center"><sub>Tracks shown are placeholder data, not a real queue.</sub></p>
+<p align="center"><sub>One password, no Discord OAuth round trip. The layout stacks on a phone.</sub></p>
 
 ---
 
