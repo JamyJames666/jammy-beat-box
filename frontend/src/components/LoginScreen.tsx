@@ -49,8 +49,9 @@ export default function LoginScreen({ onLogin }: Props) {
 
           {/* Heading */}
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold text-app-text tracking-tight">Muse</h1>
-            <p className="text-sm text-app-muted">Enter your dashboard password</p>
+            <h1 className="text-2xl font-bold text-app-text tracking-tight">Jammy Beat Box</h1>
+            <p className="text-[11px] uppercase tracking-[0.18em] text-app-accent mt-1">Run the room from a browser</p>
+            <p className="text-sm text-app-muted mt-2">Enter your dashboard password</p>
           </div>
 
           {/* Form */}

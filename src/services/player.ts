@@ -544,7 +544,7 @@ export default class {
       return;
     }
 
-    // Build new search from title + artist — handles both ytsearch and resolved IDs
+    // Build new search from title + artist, handles both ytsearch and resolved IDs
     song.url = `ytsearch1:${song.title} ${song.artist} ${suffix}`;
     song.thumbnailUrl = null; // Resolved when the song plays
   }
@@ -681,10 +681,10 @@ export default class {
   }
 
   // Resolve album-art thumbnails for queued and pending songs using the Deezer
-  // public search API (no auth required).  Queue items are live references —
+  // public search API (no auth required).  Queue items are live references ,
   // thumbnailUrl mutations appear in the status API on the next 2-second poll.
   prefetchThumbnails(): void {
-    // Skip if a fetch is already running — prevents parallel Deezer floods
+    // Skip if a fetch is already running, prevents parallel Deezer floods
     // when the frontend calls refresh-thumbnails every few seconds.
     if (this.thumbnailFetchInProgress) {
       return;
@@ -723,7 +723,7 @@ export default class {
                 if (cover && !song.thumbnailUrl) {
                   song.thumbnailUrl = cover;
                 }
-              } catch { /* malformed JSON — leave thumbnail null */ }
+              } catch { /* malformed JSON, leave thumbnail null */ }
 
               resolve();
             });
@@ -741,7 +741,7 @@ export default class {
         });
       });
 
-    // Deezer allows 50 req / 5 s — fire 50 at a time with a 5 s gap.
+    // Deezer allows 50 req / 5 s, fire 50 at a time with a 5 s gap.
     this.thumbnailFetchInProgress = true;
     void (async () => {
       try {
@@ -808,7 +808,7 @@ export default class {
         }
 
         song.url = result.id;
-        // YouTube thumbnails disabled — Deezer provides higher-quality
+        // YouTube thumbnails disabled, Deezer provides higher-quality
         // album art via prefetchThumbnails and doesn't show video screenshots.
       }
 
@@ -829,7 +829,7 @@ export default class {
       }
 
       // Seek: need a URL with -ss; piped stream doesn't support seeking.
-      // ytsearch1: URLs can't be resolved to a seekable CDN URL — pipe from start instead.
+      // ytsearch1: URLs can't be resolved to a seekable CDN URL, pipe from start instead.
       if (song.url.startsWith('ytsearch')) {
         const {stream: ytdlpStream, kill: ytdlpKill} = createYtDlpAudioStream(song.url);
         return this.createReadStream({input: ytdlpStream, ytdlpKill, cacheKey: song.url, cache: false});

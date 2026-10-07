@@ -25,7 +25,7 @@ import { fmtTime, cn } from '@/lib/utils'
 const fmtDuration = fmtTime
 import SourceBadge from './SourceBadge'
 
-const PAGE_SIZE = 99999 // no pagination — one scrollable list
+const PAGE_SIZE = 99999 // no pagination, one scrollable list
 
 function getHighQualityThumb(url: string | null): string | null {
   if (!url) return null
@@ -270,13 +270,13 @@ export default function QueueCard({
     <div className="flex flex-col overflow-hidden h-full">
 
       {/* Header */}
-      <div className="flex items-center gap-3 px-8 pt-8 pb-3 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 sm:px-8 pt-6 sm:pt-8 pb-3 flex-shrink-0">
         <ListMusic size={14} className="flex-shrink-0 text-app-accent" />
-        <h2 className="text-sm font-semibold">Up Next</h2>
+        <h2 className="text-sm font-semibold whitespace-nowrap">Up Next</h2>
 
         {/* Song count + duration */}
         {displayQueue.length > 0 ? (
-          <div className="flex items-center gap-2 mr-auto">
+          <div className="flex items-center gap-2 mr-auto whitespace-nowrap">
             <span className="text-xs tabular-nums" style={{ color: '#666' }}>
               {displayQueue.length} songs
             </span>
@@ -293,7 +293,7 @@ export default function QueueCard({
           <span className="mr-auto" />
         )}
 
-        {/* Load Lazy Songs — always visible */}
+        {/* Load Lazy Songs, always visible */}
         <button
           onClick={handleBringToQueue}
           disabled={bringingToQueue || pendingCount === 0}
@@ -352,7 +352,7 @@ export default function QueueCard({
         </div>
       )}
 
-      {/* Queue list — scrollable */}
+      {/* Queue list, scrollable */}
       <div className="flex-1 overflow-y-auto px-6 min-h-0">
         {displayQueue.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">

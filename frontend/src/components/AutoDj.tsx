@@ -6,7 +6,7 @@ import {
 import { cn } from '@/lib/utils'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Toggle — a big pill-style on/off switch with label + description
+// Toggle, a big pill-style on/off switch with label + description
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ToggleProps {
@@ -59,7 +59,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CrossfadeSlider — pick duration with visual presets
+// CrossfadeSlider, pick duration with visual presets
 // ─────────────────────────────────────────────────────────────────────────────
 
 const XFADE_OPTIONS = [

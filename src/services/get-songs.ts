@@ -84,7 +84,7 @@ export default class {
         }
       }
     } catch (err: any) {
-      // Never fall back to YouTube search for Spotify URLs — surface the real error
+      // Never fall back to YouTube search for Spotify URLs, surface the real error
       if (isSpotifyUrl) {
         throw err;
       }
@@ -175,7 +175,7 @@ export default class {
       source: MediaSource.Youtube,
       title: track.name,
       artist: track.artist,
-      // Use unquoted search — exact-phrase quoting breaks on special characters in
+      // Use unquoted search, exact-phrase quoting breaks on special characters in
       // track/artist names and some yt-dlp versions mis-parse the nested quotes.
       url: `ytsearch1:${track.name} ${track.artist} lyric video`,
       length: track.durationSeconds,

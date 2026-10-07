@@ -31,7 +31,7 @@ export default function BotSettings({ token, guildId }: Props) {
       setChannels(chs)
       setCurrent(setting.announcementChannelId)
     } catch {
-      /* non-fatal — card still renders with empty list */
+      /* non-fatal, card still renders with empty list */
     } finally {
       setLoading(false)
     }

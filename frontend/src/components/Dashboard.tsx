@@ -116,7 +116,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
 
   return (
     <div className="min-h-screen bg-app-bg">
-      {/* Header — no hard border, fades into content */}
+      {/* Header, no hard border, fades into content */}
       <header className="sticky top-0 z-30 backdrop-blur-md px-6 py-3"
         style={{ background: 'rgba(7,6,15,0.75)' }}>
         <div className="max-w-[1800px] mx-auto flex items-center gap-4">
@@ -161,9 +161,9 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
       ) : _view === 'autodj' ? (
         <AutoDj status={status} token={token} guildId={guildId} onRefresh={poll} />
       ) : (
-        <div className="relative flex overflow-hidden" style={{ height: 'calc(100vh - 53px)' }}>
+        <div className="relative flex flex-col lg:flex-row lg:overflow-hidden lg:h-[calc(100vh-53px)]">
 
-          {/* Full-width blurred art background — covers both halves */}
+          {/* Full-width blurred art background, covers both halves */}
           {status?.nowPlaying?.thumbnailUrl && (
             <div
               key={status.nowPlaying.thumbnailUrl}
@@ -181,7 +181,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
           )}
 
           {/* Left: Now Playing */}
-          <div className="w-1/2 relative flex flex-col" style={{ zIndex: 1 }}>
+          <div className="w-full lg:w-1/2 relative flex flex-col" style={{ zIndex: 1 }}>
             {/* Ambient glow */}
             <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none"
               style={{
@@ -191,7 +191,7 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
                 borderRadius: '50%',
                 zIndex: 0,
               }} />
-            <div className="relative z-10 flex flex-col gap-4 p-8 h-full overflow-y-auto">
+            <div className="relative z-10 flex flex-col gap-4 p-5 sm:p-8 h-full lg:overflow-y-auto">
               <NowPlaying status={status} token={token} guildId={guildId} onRefresh={poll} />
               <div className="mt-auto flex flex-col gap-3 pt-4">
                 <AddToQueue
@@ -207,8 +207,12 @@ export default function Dashboard({ token, onSessionExpired, onReconnecting }: P
             </div>
           </div>
 
-          {/* Right: Queue — transparent, shares the same blurred bg */}
-          <div className="w-1/2 flex flex-col overflow-hidden" style={{ zIndex: 1, borderLeft: '1px solid rgba(255,255,255,0.07)' }}>
+          {/* Right: Queue, transparent, shares the same blurred bg */}
+          <div
+            className="w-full lg:w-1/2 flex flex-col lg:overflow-hidden min-h-[70vh] lg:min-h-0
+                       border-t lg:border-t-0 lg:border-l border-white/[0.07]"
+            style={{ zIndex: 1 }}
+          >
             <QueueCard
               queue={status?.queue ?? []}
               token={token}

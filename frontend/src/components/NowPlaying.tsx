@@ -60,7 +60,7 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
   return (
     <div className="relative flex flex-col items-center z-10 w-full">
 
-      {/* Big ambient glow — pulsing when playing */}
+      {/* Big ambient glow, pulsing when playing */}
       <div
         className="absolute pointer-events-none transition-opacity duration-700"
         style={{
@@ -114,7 +114,7 @@ export default function NowPlaying({ status, token, guildId, onRefresh }: Props)
               </div>
             )}
 
-            {/* Animated bars — bottom right corner */}
+            {/* Animated bars, bottom right corner */}
             <div className={cn('absolute bottom-4 right-4 flex items-end gap-[3px] h-5', !isPlaying && 'opacity-0')}>
               <span className="block w-1 rounded-sm animate-bar"   style={{ background: 'rgba(255,255,255,0.8)' }} />
               <span className="block w-1 rounded-sm animate-bar-2" style={{ background: 'rgba(255,255,255,0.8)' }} />

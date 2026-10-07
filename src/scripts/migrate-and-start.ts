@@ -133,7 +133,7 @@ const hasDatabaseBeenMigratedToPrisma = async () => {
       await healClient.$executeRawUnsafe(`ALTER TABLE "Setting" ADD COLUMN "${col}" ${def}`);
     }
   } catch {
-    // Table doesn't exist yet on a brand-new database — migrations will create it.
+    // Table doesn't exist yet on a brand-new database, migrations will create it.
   }
 
   await healClient.$disconnect();

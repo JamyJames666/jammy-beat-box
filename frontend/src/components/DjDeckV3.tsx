@@ -1,5 +1,5 @@
 /**
- * DJ Deck v3 — Professional Pioneer/Serato-style interface.
+ * DJ Deck v3, Professional Pioneer/Serato-style interface.
  *
  * Layout: dual waveform bar → 3-column deck (A | Mixer | B) → queue strip.
  * All audio control uses existing API endpoints; no backend changes required.
@@ -91,7 +91,7 @@ function VuMeter({ isPlaying, deckColor }: { isPlaying: boolean; deckColor: stri
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// EqKnob — drag-to-rotate SVG knob
+// EqKnob, drag-to-rotate SVG knob
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface EqKnobProps {
@@ -565,7 +565,7 @@ export default function DjDeckV3({ status, token, guildId, onRefresh }: Props) {
               </div>
               {/* Divider */}
               <div style={{ width: 1, alignSelf: 'stretch', background: '#1a1a2a' }} />
-              {/* EQ B knobs (decorative — mirrors A) */}
+              {/* EQ B knobs (decorative, mirrors A) */}
               <div className="flex gap-3">
                 <EqKnob label="HI"  value={0} color="#f97316" onChange={() => null} onCommit={() => null} />
                 <EqKnob label="MID" value={0} color="#f97316" onChange={() => null} onCommit={() => null} />

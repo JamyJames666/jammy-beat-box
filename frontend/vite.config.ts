@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   build: {
-    // Output directly into the existing static/ folder — no changes to web-server.ts needed
+    // Output directly into the existing static/ folder, no changes to web-server.ts needed
     outDir: '../static',
     emptyOutDir: true,
   },

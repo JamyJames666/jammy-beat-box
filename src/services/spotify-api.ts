@@ -274,7 +274,7 @@ export default class {
         const totalInPlaylist = firstPage.total ?? 0;
 
         if (totalInPlaylist > entity.trackList.length) {
-          // Playlist has more songs than the embed returned — paginate the full list
+          // Playlist has more songs than the embed returned, paginate the full list
           const paginated = await this.paginateWithEmbedToken(tokenToUse, playlistId, Math.min(playlistLimit, totalInPlaylist));
           if (paginated.length > tracks.length) {
             tracks = paginated;
@@ -282,7 +282,7 @@ export default class {
         }
         // If totalInPlaylist <= embed count, the embed already gave us everything
       } catch {
-        // Could not check total — attempt pagination anyway as a best-effort
+        // Could not check total, attempt pagination anyway as a best-effort
         const paginated = await this.paginateWithEmbedToken(tokenToUse, playlistId, playlistLimit);
         if (paginated.length > tracks.length) {
           tracks = paginated;
@@ -300,7 +300,7 @@ export default class {
 
   private async getAnonymousToken(userAgent: string): Promise<string | null> {
     try {
-      // Spotify requires the sp_t session cookie — get it by hitting the main page first.
+      // Spotify requires the sp_t session cookie, get it by hitting the main page first.
       const homeRes = await got('https://open.spotify.com/', {
         headers: {'User-Agent': userAgent},
         timeout: {request: 10_000},
@@ -326,7 +326,7 @@ export default class {
     }
   }
 
-  // Offset-based pagination — per-page error handling so one failed page
+  // Offset-based pagination, per-page error handling so one failed page
   // doesn't lose all previously collected tracks.
   private async paginatePlaylist(token: string, playlistId: string, limit: number): Promise<SpotifyTrack[]> {
     interface PageItem {
@@ -417,7 +417,7 @@ export default class {
       const url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50&offset=${offset}`;
       let body: TracksPage | null = null;
 
-      // Retry with backoff on rate-limit (429) — up to MAX_FAILURES times
+      // Retry with backoff on rate-limit (429), up to MAX_FAILURES times
       for (let attempt = 0; attempt < MAX_FAILURES; attempt++) {
         try {
           // eslint-disable-next-line no-await-in-loop
@@ -428,7 +428,7 @@ export default class {
         } catch (err: unknown) {
           const status = (err as {response?: {statusCode?: number}}).response?.statusCode;
           if (status === 429 && attempt < MAX_FAILURES - 1) {
-            // Rate limited — wait progressively longer before retrying
+            // Rate limited, wait progressively longer before retrying
             // eslint-disable-next-line no-await-in-loop
             await new Promise<void>(resolve => {
               setTimeout(resolve, (attempt + 1) * 2000);
@@ -481,7 +481,7 @@ export default class {
   }
 
   private limitTracks<T>(tracks: T[], limit: number): T[] {
-    // Take the first N in playlist order — user can shuffle from the web dashboard.
+    // Take the first N in playlist order, user can shuffle from the web dashboard.
     return tracks.length > limit ? tracks.slice(0, limit) : tracks;
   }
 }
