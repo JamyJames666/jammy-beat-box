@@ -67,31 +67,46 @@ const hasDatabaseBeenMigratedToPrisma = async () => {
     }
   }
 
-  // If a previous migration run crashed mid-flight, Prisma marks it as failed
-  // and refuses to deploy with P3009 until the record is cleared. Remove any
-  // rows from _prisma_migrations that never finished (NULL finished_at means
-  // started but not completed — either crashed or rolled back). This lets
-  // migrate deploy retry them cleanly on every restart.
-  const prismaClient = new Prisma.PrismaClient();
-  try {
-    await prismaClient.$executeRawUnsafe(
-      'DELETE FROM _prisma_migrations WHERE finished_at IS NULL',
-    );
-  } catch {
-    // Table may not exist yet on a fresh database — that is fine.
-  }
+  // A migration that crashed mid-flight is left with a NULL finished_at and
+  // Prisma then refuses to deploy with P3009. Clearing those rows unconditionally
+  // on every boot turns a genuinely broken migration into a silent restart loop,
+  // so only clear them after a deploy has actually failed that way, and only once.
+  const clearFailedMigrations = async () => {
+    const client = new Prisma.PrismaClient();
+    try {
+      await client.$executeRawUnsafe('DELETE FROM _prisma_migrations WHERE finished_at IS NULL');
+    } catch {
+      // Table may not exist yet on a fresh database, which is fine.
+    }
 
-  await prismaClient.$disconnect();
+    await client.$disconnect();
+  };
+
+  const deploy = async () => execa('prisma', ['migrate', 'deploy'], {preferLocal: true});
 
   try {
-    await execa('prisma', ['migrate', 'deploy'], {preferLocal: true});
-  } catch (error: unknown) {
-    if ((error as ExecaError).stderr) {
+    await deploy();
+  } catch (firstError: unknown) {
+    const stderr = (firstError as ExecaError).stderr;
+    if (typeof stderr !== 'string') {
+      throw firstError;
+    }
+
+    if (!stderr.includes('P3009')) {
       spinner.fail('Failed to apply database migrations:');
-      console.error((error as ExecaError).stderr);
+      console.error(stderr);
       process.exit(1);
-    } else {
-      throw error;
+    }
+
+    spinner.text = 'Found a migration that did not finish, clearing it and retrying once.';
+    await clearFailedMigrations();
+
+    try {
+      await deploy();
+    } catch (retryError: unknown) {
+      spinner.fail('Database migrations still failed after clearing the unfinished one:');
+      console.error((retryError as ExecaError).stderr ?? retryError);
+      process.exit(1);
     }
   }
 

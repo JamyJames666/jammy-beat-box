@@ -77,17 +77,19 @@ export default class {
 
   // Public: fetch up to batchSize tracks starting at startOffset.
   // Each 50-song page gets its own fresh embed token.
-  async getPlaylistFrom(url: string, startOffset: number, batchSize: number): Promise<SpotifyTrack[]> {
+  async getPlaylistFrom(url: string, startOffset: number, batchSize: number): Promise<{tracks: SpotifyTrack[]; scanned: number}> {
     const uri = spotifyURI.parse(url) as spotifyURI.Playlist;
     const PAGE = 50;
     const tracks: SpotifyTrack[] = [];
     const pages = Math.ceil(batchSize / PAGE);
+    let scanned = 0;
 
     for (let i = 0; i < pages; i++) {
       const offset = startOffset + (i * PAGE);
       // eslint-disable-next-line no-await-in-loop
-      const {tracks: page, hasMore} = await this.fetchTracksPage(uri.id, offset);
+      const {tracks: page, scanned: items, hasMore} = await this.fetchTracksPage(uri.id, offset);
       tracks.push(...page);
+      scanned += items;
       if (!hasMore) {
         break;
       }
@@ -101,7 +103,7 @@ export default class {
       }
     }
 
-    return tracks;
+    return {tracks, scanned};
   }
 
   async getTrack(url: string): Promise<SpotifyTrack> {
@@ -155,14 +157,14 @@ export default class {
 
   // Fetch a page of 50 tracks at a given offset.
   // On 429, waits 5 s, gets a fresh token, retries once.
-  private async fetchTracksPage(playlistId: string, offset: number): Promise<{tracks: SpotifyTrack[]; hasMore: boolean}> {
+  private async fetchTracksPage(playlistId: string, offset: number): Promise<{tracks: SpotifyTrack[]; scanned: number; hasMore: boolean}> {
     interface PageItem {
       track: {name: string; type: string; duration_ms: number; artists: Array<{name: string}>; album: {images: Array<{url: string}>}} | null;
     }
 
     let token = await this.freshEmbedToken(playlistId);
     if (!token) {
-      return {tracks: [], hasMore: false};
+      return {tracks: [], scanned: 0, hasMore: false};
     }
 
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -180,7 +182,7 @@ export default class {
             durationSeconds: Math.round((i.track!.duration_ms ?? 0) / 1000),
             thumbnailUrl: i.track!.album?.images?.[0]?.url ?? null,
           }));
-        return {tracks, hasMore: Boolean(body.next) && body.items.length === 50};
+        return {tracks, scanned: body.items.length, hasMore: Boolean(body.next) && body.items.length === 50};
       } catch (err: unknown) {
         const is429 = (err as {response?: {statusCode?: number}}).response?.statusCode === 429;
         if (is429 && attempt === 0) {
@@ -191,12 +193,12 @@ export default class {
           // eslint-disable-next-line no-await-in-loop
           token = await this.freshEmbedToken(playlistId) ?? token;
         } else {
-          return {tracks: [], hasMore: false};
+          return {tracks: [], scanned: 0, hasMore: false};
         }
       }
     }
 
-    return {tracks: [], hasMore: false};
+    return {tracks: [], scanned: 0, hasMore: false};
   }
 
   private async getPlaylistViaEmbed(playlistId: string, originalUrl: string, playlistLimit: number): Promise<[SpotifyTrack[], QueuedPlaylist]> {

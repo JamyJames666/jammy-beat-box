@@ -84,7 +84,7 @@ export default class {
   public loopCurrentQueue = false;
   // Tracks the last Spotify playlist URL and how many songs were loaded
   // so "Load More from Spotify" can fetch the next batch at the right offset.
-  public spotifyPlaylistContext: {url: string; loadedCount: number} | null = null;
+  public spotifyPlaylistContext: {url: string; loadedCount: number; exhausted?: boolean} | null = null;
   private currentChannel: VoiceChannel | undefined;
   private queue: QueuedSong[] = [];
   private queuePosition = 0;
@@ -184,6 +184,8 @@ export default class {
       this.currentChannel = undefined;
       this.channelToSpeakingUsers.clear();
       this.hasRegisteredVoiceActivityListener = false;
+      this.cancelEmptyChannelDisconnect();
+      this.stopThumbnailSweep();
     }
   }
 
@@ -883,6 +885,13 @@ export default class {
     }
   }
 
+  private stopThumbnailSweep(): void {
+    if (this.thumbSweepInterval) {
+      clearInterval(this.thumbSweepInterval);
+      this.thumbSweepInterval = undefined;
+    }
+  }
+
   private attachListeners(): void {
     if (!this.voiceConnection) {
       return;
@@ -1049,9 +1058,13 @@ export default class {
 
       const stream = ffmpegCmd
         .on('error', error => {
+          options.ytdlpKill?.();
           if (!hasReturnedStreamClosed) {
             reject(error);
           }
+        })
+        .on('end', () => {
+          options.ytdlpKill?.();
         })
         .on('start', command => {
           debug(`Spawned ffmpeg with ${command}`);

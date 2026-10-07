@@ -27,8 +27,8 @@ export default function AddToQueue({ token, guildId, channels, channelId, onChan
 
     try {
       const res = await play(token, guildId, q, channelId || undefined)
-      const pendingMsg = (res.pending ?? 0) > 0 ? ` · ${res.pending} lazy` : ''
-      setStatus({ ok: true, msg: `Added ${res.added} songs (${res.queued ?? res.added} queued${pendingMsg}) — ${res.first}` })
+      const pendingMsg = res.pending > 0 ? ` · ${res.pending} lazy` : ''
+      setStatus({ ok: true, msg: `Added ${res.added} songs (${res.queued} queued${pendingMsg}) — ${res.first}` })
       setQuery('')
       setTimeout(() => setStatus(null), 4000)
       onRefresh()

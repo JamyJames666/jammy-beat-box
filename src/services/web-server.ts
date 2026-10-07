@@ -19,6 +19,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Keeping tokens short-lived reduces the blast radius if localStorage is
 // accessed by injected JS. Full httpOnly-cookie migration is a future task.
 const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 1 day
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_MAX_ATTEMPTS = 10;
+
+// Signing tokens with WEB_PASSWORD would let anyone holding a token brute
+// force the password offline. A per-process key costs only a re-login on
+// restart.
+const TOKEN_KEY = crypto.randomBytes(32);
+
+const isQueuePosition = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 1;
+
+const sameSecret = (a: string, b: string): boolean => {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+};
 
 /**
  * Detect whether a queued song originated from Spotify or YouTube.
@@ -156,6 +172,11 @@ export default class WebServer {
       return;
     }
 
+    if (this.config.WEB_TRUST_PROXY) {
+      const hops = Number(this.config.WEB_TRUST_PROXY);
+      this.app.set('trust proxy', Number.isInteger(hops) ? hops : this.config.WEB_TRUST_PROXY);
+    }
+
     this.app.use(express.json());
     this.app.use(express.static(path.join(__dirname, '../../static')));
 
@@ -164,29 +185,33 @@ export default class WebServer {
     this.app.post('/api/login', (req: express.Request, res: express.Response) => {
       const ip = req.ip ?? 'unknown';
       const now = Date.now();
+
+      for (const [key, value] of loginAttempts) {
+        if (now >= value.resetAt) {
+          loginAttempts.delete(key);
+        }
+      }
+
       const record = loginAttempts.get(ip);
 
-      if (record && now < record.resetAt && record.count >= 10) {
+      if (record && record.count >= LOGIN_MAX_ATTEMPTS) {
         res.status(429).json({error: 'Too many login attempts'});
         return;
       }
 
-      if (!record || now >= record.resetAt) {
-        loginAttempts.set(ip, {count: 1, resetAt: now + (15 * 60 * 1000)});
-      } else {
+      if (record) {
         record.count++;
+      } else {
+        loginAttempts.set(ip, {count: 1, resetAt: now + LOGIN_WINDOW_MS});
       }
 
       const {password} = req.body as {password?: string};
-      if (password !== this.password) {
+      if (typeof password !== 'string' || !sameSecret(password, this.password)) {
         res.status(401).json({error: 'Invalid password'});
         return;
       }
 
-      const entry = loginAttempts.get(ip);
-      if (entry) {
-        entry.count = 0;
-      }
+      loginAttempts.delete(ip);
 
       res.json({token: this.generateToken()});
     });
@@ -352,7 +377,13 @@ export default class WebServer {
           }
         }
 
-        res.json({ok: true, added: songs.length, first: songs[0].title});
+        res.json({
+          ok: true,
+          added: songs.length,
+          queued: activeSongs.length,
+          pending: pendingSongs.length,
+          first: songs[0].title,
+        });
       } catch (e: unknown) {
         res.status(400).json({error: (e as Error).message});
       }
@@ -401,7 +432,7 @@ export default class WebServer {
             }
           }
 
-          return player.spotifyPlaylistContext !== null;
+          return player.spotifyPlaylistContext !== null && !player.spotifyPlaylistContext.exhausted;
         })(),
       });
     });
@@ -466,8 +497,8 @@ export default class WebServer {
 
     this.app.post('/api/guilds/:guildId/queue/move', auth, (req: express.Request, res: express.Response) => {
       const {from, to} = req.body as {from?: number; to?: number};
-      if (typeof from !== 'number' || typeof to !== 'number') {
-        res.status(400).json({error: 'from and to are required'});
+      if (!isQueuePosition(from) || !isQueuePosition(to)) {
+        res.status(400).json({error: 'from and to must be queue positions, 1 or higher'});
         return;
       }
 
@@ -481,8 +512,8 @@ export default class WebServer {
 
     this.app.post('/api/guilds/:guildId/queue/remove', auth, (req: express.Request, res: express.Response) => {
       const {index} = req.body as {index?: number};
-      if (typeof index !== 'number') {
-        res.status(400).json({error: 'index is required'});
+      if (!isQueuePosition(index)) {
+        res.status(400).json({error: 'index must be a queue position, 1 or higher'});
         return;
       }
 
@@ -498,7 +529,7 @@ export default class WebServer {
       const {count} = req.body as {count?: number};
       try {
         const player = this.playerManager.get(req.params.guildId);
-        player.flushPending(typeof count === 'number' ? count : 100);
+        player.flushPending(Number.isInteger(count) && count! > 0 ? count! : 100);
         // Fetch Deezer thumbnails for the newly loaded songs
         player.prefetchThumbnails();
         res.json({ok: true});
@@ -538,9 +569,10 @@ export default class WebServer {
         }
 
         const BATCH = 100; // Spotify's embed token tolerates ~2 pages (50 each) per request
-        const newTracks = await this.spotifyApi.getPlaylistFrom(ctx.url, ctx.loadedCount, BATCH);
+        const {tracks: newTracks, scanned} = await this.spotifyApi.getPlaylistFrom(ctx.url, ctx.loadedCount, BATCH);
 
-        if (newTracks.length === 0) {
+        if (scanned === 0) {
+          player.spotifyPlaylistContext = {...ctx, exhausted: true};
           res.json({ok: true, added: 0, message: 'No more songs to load from this playlist.'});
           return;
         }
@@ -574,8 +606,9 @@ export default class WebServer {
           }
         }
 
-        // Advance the stored offset so the next "Load More" gets a fresh batch
-        player.spotifyPlaylistContext = {url: ctx.url, loadedCount: ctx.loadedCount + newTracks.length};
+        // Advance by what Spotify counted, not by what survived the filter,
+        // or removed and local tracks make the offset drift backwards.
+        player.spotifyPlaylistContext = {url: ctx.url, loadedCount: ctx.loadedCount + scanned};
 
         player.prefetchThumbnails();
         res.json({ok: true, added, nextOffset: player.spotifyPlaylistContext.loadedCount});
@@ -588,8 +621,8 @@ export default class WebServer {
     // (e.g. "radio edit", "lyric video"). Suffix is appended to "title artist".
     this.app.post('/api/guilds/:guildId/queue/variant', auth, (req: express.Request, res: express.Response) => {
       const {index, suffix} = req.body as {index?: number; suffix?: string};
-      if (typeof index !== 'number' || !suffix?.trim()) {
-        res.status(400).json({error: 'index and suffix are required'});
+      if (!isQueuePosition(index) || !suffix?.trim()) {
+        res.status(400).json({error: 'index must be a queue position and suffix is required'});
         return;
       }
 
@@ -733,7 +766,7 @@ export default class WebServer {
 
   private generateToken(): string {
     const timestamp = Date.now().toString();
-    const sig = crypto.createHmac('sha256', this.password).update(timestamp).digest('hex');
+    const sig = crypto.createHmac('sha256', TOKEN_KEY).update(timestamp).digest('hex');
     return Buffer.from(`${timestamp}.${sig}`).toString('base64url');
   }
 
@@ -747,7 +780,7 @@ export default class WebServer {
 
       const timestamp = decoded.slice(0, dotIndex);
       const sig = decoded.slice(dotIndex + 1);
-      const expectedSig = crypto.createHmac('sha256', this.password).update(timestamp).digest('hex');
+      const expectedSig = crypto.createHmac('sha256', TOKEN_KEY).update(timestamp).digest('hex');
 
       if (!crypto.timingSafeEqual(Buffer.from(sig, 'hex'), Buffer.from(expectedSig, 'hex'))) {
         return false;
