@@ -94,7 +94,7 @@
     "@distube/ytsr": "^2.0.4",
     "@prisma/client": "4.16.0",
     "@types/libsodium-wrappers": "^0.7.9",
-    "array-shuffle": "^3.0.0",
+    "array-shuffle": "^4.1.0",
     "debug": "^4.3.3",
     "delay": "^5.0.0",
     "discord-api-types": "0.32.1",
