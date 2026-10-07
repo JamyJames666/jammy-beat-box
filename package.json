@@ -129,7 +129,7 @@
     "spotify-url-info": "^3.3.0",
     "spotify-web-api-node": "^5.0.2",
     "sync-fetch": "^0.3.1",
-    "tsx": "3.8.2",
+    "tsx": "4.23.15",
     "xbytes": "^1.7.0",
     "ytsr": "^3.8.4"
   },
